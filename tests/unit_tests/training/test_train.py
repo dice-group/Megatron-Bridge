@@ -600,6 +600,7 @@ class TestCheckpointAndDecideExit:
             "num_floating_point_operations_so_far": 1000.0,
             "checkpointing_context": {},
             "train_data_iterator": None,
+            "callback_manager": None,
         }
 
     @patch("megatron.bridge.training.train.save_checkpoint_and_time")
