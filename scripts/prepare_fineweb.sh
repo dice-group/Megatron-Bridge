@@ -67,7 +67,7 @@ output_dir     = "${OUTPUT_DIR}"
 print(f"  Streaming FineWeb sample-10BT (first {num_samples:,} docs)...")
 ds = load_dataset(
     "HuggingFaceFW/fineweb",
-    name="sample-10BT",
+    name="sample-350BT",
     split="train",
     streaming=True,
 )
