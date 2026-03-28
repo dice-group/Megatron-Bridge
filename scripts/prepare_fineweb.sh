@@ -20,8 +20,8 @@
 set -euo pipefail
 
 # ── defaults ────────────────────────────────────────────────────────────────
-HF_MODEL=""
-OUTPUT_DIR=""
+HF_MODEL="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/hf-tokenizer"
+OUTPUT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/data/fineweb"
 NUM_SAMPLES=5000000   # ~10 GB of text; adjust up for longer runs
 WORKERS=16
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -38,10 +38,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$HF_MODEL" || -z "$OUTPUT_DIR" ]]; then
-  echo "Usage: $0 --hf-model <path> --output <dir> [--num-samples N] [--workers N]"
-  exit 1
-fi
+echo "Using hf-model: $HF_MODEL"
+echo "Using output:   $OUTPUT_DIR"
 
 mkdir -p "$OUTPUT_DIR"
 
