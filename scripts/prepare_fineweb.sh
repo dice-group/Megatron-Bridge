@@ -64,7 +64,7 @@ valid_samples  = ${VALID_SAMPLES}
 test_samples   = ${TEST_SAMPLES}
 output_dir     = "${OUTPUT_DIR}"
 
-print(f"  Streaming FineWeb sample-10BT (first {num_samples:,} docs)...")
+print(f"  Streaming FineWeb sample-350BT (first {num_samples:,} docs)...")
 ds = load_dataset(
     "HuggingFaceFW/fineweb",
     name="sample-350BT",
