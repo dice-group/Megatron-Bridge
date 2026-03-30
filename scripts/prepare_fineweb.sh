@@ -161,8 +161,11 @@ fi
 # ── step 2: tokenize each split ──────────────────────────────────────────────
 echo "[2/3] Tokenizing with preprocess_data.py..."
 
+# Prevent HF tokenizer internal threads from fighting multiprocessing workers
+export TOKENIZERS_PARALLELISM=false
+
 PREPROCESS="$REPO_ROOT/3rdparty/Megatron-LM/tools/preprocess_data.py"
-PARTITIONS=8  # parallel writers; workers must be divisible by this
+PARTITIONS=2  # keep low so each partition gets more workers (workers/partitions)
 
 for SPLIT in train valid test; do
   echo "  Tokenizing $SPLIT..."
