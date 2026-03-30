@@ -79,7 +79,7 @@ train_samples  = ${TRAIN_SAMPLES}
 valid_samples  = ${VALID_SAMPLES}
 test_samples   = ${TEST_SAMPLES}
 output_dir     = "${OUTPUT_DIR}"
-num_dl_workers = min(${WORKERS}, 16)
+num_dl_workers = min(${WORKERS}, 32)
 
 print(f"  Downloading FineWeb sample-350BT ({num_samples:,} docs) with {num_dl_workers} parallel workers...")
 
