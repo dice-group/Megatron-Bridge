@@ -227,6 +227,8 @@ def setup(
         pg_collection=pg_collection,
     )
 
+    print_rank_0(model[0])
+
     cfg.model.timers = timers
     cfg.optimizer.timers = timers
     optimizer, scheduler = setup_optimizer(
