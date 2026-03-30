@@ -55,22 +55,55 @@ if [[ -f "$OUTPUT_DIR/fineweb_train.jsonl" && -f "$OUTPUT_DIR/fineweb_valid.json
 else
   echo "[1/3] Downloading FineWeb (${NUM_SAMPLES} samples) and writing JSONL..."
   python3 - <<EOF
-import json
+import json, os
+from multiprocessing import Process, Queue, Value
+from ctypes import c_bool
 from datasets import load_dataset
+from tqdm import tqdm
+
+# Use orjson for faster serialization if available
+try:
+    import orjson
+    def dumps(obj): return orjson.dumps(obj).decode()
+except ImportError:
+    def dumps(obj): return json.dumps(obj)
 
 num_samples    = ${NUM_SAMPLES}
 train_samples  = ${TRAIN_SAMPLES}
 valid_samples  = ${VALID_SAMPLES}
 test_samples   = ${TEST_SAMPLES}
 output_dir     = "${OUTPUT_DIR}"
+num_dl_workers = min(${WORKERS}, 16)
 
-print(f"  Streaming FineWeb sample-350BT (first {num_samples:,} docs)...")
-ds = load_dataset(
-    "HuggingFaceFW/fineweb",
-    name="sample-350BT",
-    split="train",
-    streaming=True,
-)
+print(f"  Downloading FineWeb sample-350BT ({num_samples:,} docs) with {num_dl_workers} parallel workers...")
+
+def worker_fn(worker_id, num_workers, queue, stop_flag):
+    os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
+    ds = load_dataset(
+        "HuggingFaceFW/fineweb",
+        name="sample-350BT",
+        split="train",
+        streaming=True,
+    ).shard(num_shards=num_workers, index=worker_id)
+    for doc in ds:
+        if stop_flag.value:
+            break
+        text = doc.get("text", "").strip()
+        if text:
+            while not stop_flag.value:
+                try:
+                    queue.put(text, timeout=0.1)
+                    break
+                except Exception:
+                    pass
+    queue.put(None)  # sentinel
+
+queue      = Queue(maxsize=50_000)
+stop_flag  = Value(c_bool, False)
+workers    = [Process(target=worker_fn, args=(i, num_dl_workers, queue, stop_flag), daemon=True)
+              for i in range(num_dl_workers)]
+for p in workers:
+    p.start()
 
 splits = {
     "train": (output_dir + "/fineweb_train.jsonl", train_samples),
@@ -78,23 +111,38 @@ splits = {
     "test":  (output_dir + "/fineweb_test.jsonl",  test_samples),
 }
 
-handles = {k: open(path, "w") for k, (path, _) in splits.items()}
-counts  = {k: 0 for k in splits}
+handles      = {k: open(path, "w", buffering=1 << 20) for k, (path, _) in splits.items()}
+counts       = {k: 0 for k in splits}
+total        = 0
+done_workers = 0
 
-for doc in ds:
-    text = doc.get("text", "").strip()
-    if not text:
-        continue
-    for split, (_, limit) in splits.items():
-        if counts[split] < limit:
-            handles[split].write(json.dumps({"text": text}) + "\n")
-            counts[split] += 1
+with tqdm(total=num_samples, unit="doc", dynamic_ncols=True) as pbar:
+    while done_workers < num_dl_workers and total < num_samples:
+        try:
+            item = queue.get(timeout=1.0)
+        except Exception:
+            continue
+        if item is None:
+            done_workers += 1
+            continue
+        for split, (_, limit) in splits.items():
+            if counts[split] < limit:
+                handles[split].write(dumps({"text": item}) + "\n")
+                counts[split] += 1
+                total += 1
+                pbar.update(1)
+                break
+        if total >= num_samples:
+            stop_flag.value = True
             break
-    if all(counts[k] >= lim for k, (_, lim) in splits.items()):
-        break
 
+stop_flag.value = True
 for h in handles.values():
+    h.flush()
     h.close()
+for p in workers:
+    p.terminate()
+    p.join(timeout=5)
 
 for split, count in counts.items():
     print(f"  {split}: {count:,} docs written")
