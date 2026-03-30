@@ -56,6 +56,12 @@ else
   echo "[1/3] Downloading FineWeb (${NUM_SAMPLES} samples) and writing JSONL..."
   python3 - <<EOF
 import json, os
+
+# Redirect HF cache to writable location before importing datasets
+_hf_cache = "${OUTPUT_DIR}/.hf_cache"
+os.makedirs(_hf_cache, exist_ok=True)
+os.environ.setdefault("HF_HOME", _hf_cache)
+
 from multiprocessing import Process, Queue, Value
 from ctypes import c_bool
 from datasets import load_dataset
@@ -78,6 +84,7 @@ num_dl_workers = min(${WORKERS}, 16)
 print(f"  Downloading FineWeb sample-350BT ({num_samples:,} docs) with {num_dl_workers} parallel workers...")
 
 def worker_fn(worker_id, num_workers, queue, stop_flag):
+    os.environ.setdefault("HF_HOME", _hf_cache)
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
     ds = load_dataset(
         "HuggingFaceFW/fineweb",
