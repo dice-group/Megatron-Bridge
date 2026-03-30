@@ -162,7 +162,6 @@ fi
 echo "[2/3] Tokenizing with preprocess_data.py..."
 
 PREPROCESS="$REPO_ROOT/3rdparty/Megatron-LM/tools/preprocess_data.py"
-MERGE="$REPO_ROOT/3rdparty/Megatron-LM/tools/merge_datasets.py"
 PARTITIONS=8  # parallel writers; workers must be divisible by this
 
 for SPLIT in train valid test; do
@@ -177,12 +176,7 @@ for SPLIT in train valid test; do
     --partitions   "$PARTITIONS" \
     --append-eod
 
-  echo "  Merging $SPLIT partitions..."
-  python3 "$MERGE" \
-    --input $(for i in $(seq 0 $((PARTITIONS-1))); do echo "$OUTPUT_DIR/fineweb_${SPLIT}_${i}_text_document"; done) \
-    --output-prefix "$OUTPUT_DIR/fineweb_${SPLIT}_text_document"
-
-  # Clean up partition files
+  # Clean up partition files (preprocess_data.py merges internally)
   for i in $(seq 0 $((PARTITIONS-1))); do
     rm -f "$OUTPUT_DIR/fineweb_${SPLIT}_${i}"*.bin \
           "$OUTPUT_DIR/fineweb_${SPLIT}_${i}"*.idx \
