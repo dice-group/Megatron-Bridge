@@ -31,9 +31,9 @@ def main():
         sys.path.insert(0, megatron_path)
 
     try:
-        from megatron.core.datasets.indexed_dataset import MMapIndexedDataset
+        from megatron.core.datasets.indexed_dataset import IndexedDataset
     except ImportError as e:
-        print(f"Error importing Megatron's MMapIndexedDataset: {e}")
+        print(f"Error importing Megatron's IndexedDataset: {e}")
         print(f"Looked in: {megatron_path}")
         sys.exit(1)
 
@@ -50,15 +50,15 @@ def main():
         sys.exit(1)
 
     try:
-        dataset = MMapIndexedDataset(args.data_prefix)
+        dataset = IndexedDataset(args.data_prefix)
     except Exception as e:
         print(f"\nFailed to load dataset: {e}")
         sys.exit(1)
 
-    # .sizes contains the lengths (in tokens) of every document in the index
+    # .sequence_lengths contains the lengths (in tokens) of every document in the index
     import numpy as np
-    total_tokens = np.sum(dataset.sizes)
-    total_docs = len(dataset.sizes)
+    total_tokens = np.sum(dataset.sequence_lengths)
+    total_docs = len(dataset.sequence_lengths)
     
     print("\n" + "="*50)
     print(f"Dataset Stats:")
