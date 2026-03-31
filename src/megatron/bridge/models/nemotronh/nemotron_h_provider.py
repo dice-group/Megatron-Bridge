@@ -55,6 +55,8 @@ class NemotronHModelProvider(MambaModelProvider):
     moe_permute_fusion: bool = True
     moe_shared_expert_overlap: bool = True
     moe_latent_size: int | None = None
+    moe_topany_target_k: float = 2.0
+    moe_topany_update_rate: float = 0.01
 
 @dataclass
 class NemotronHModelProvider4B(NemotronHModelProvider):
