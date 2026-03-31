@@ -19,8 +19,10 @@
 DATA_DIR=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/data/fineweb
 CHECKPOINT_DIR=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/checkpoints_lossfree
 
-# Required for WandB logging — get your key from https://wandb.ai/authorize
-export WANDB_API_KEY="YOUR_KEY_HERE"
+# Load WandB key from .env file
+if [ -f "$PWD/.env" ]; then
+    export $(grep -v '^#' "$PWD/.env" | xargs)
+fi
 
 # Routing type: "topany", "lossfree", or "topk"
 ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
