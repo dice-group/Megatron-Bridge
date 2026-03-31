@@ -29,7 +29,7 @@ export WANDB_API_KEY="YOUR_KEY_HERE"
 # Derived paths — do not edit
 # ==============================================================================
 
-CONTAINER="$PWD/nemo-container"
+CONTAINER="$PWD/../nemo-container"
 BLEND_PATH="$DATA_DIR/blend.json"
 
 # Iterations:

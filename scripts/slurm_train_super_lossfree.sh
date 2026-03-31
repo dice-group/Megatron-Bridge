@@ -29,7 +29,7 @@ ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 # Derived paths — do not edit
 # ==============================================================================
 
-CONTAINER="$PWD/nemo-container"
+CONTAINER="$PWD/../nemo-container"
 BLEND_PATH="$DATA_DIR/blend.json"
 
 TRAIN_ITERS=50000
