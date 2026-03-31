@@ -34,9 +34,9 @@ ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 CONTAINER="$PWD/../nemo-container"
 BLEND_PATH="$DATA_DIR/blend.json"
 
-TRAIN_ITERS=50000
-LR_WARMUP_ITERS=2000
-SAVE_INTERVAL=1000
+TRAIN_ITERS=1043496
+LR_WARMUP_ITERS=104349
+SAVE_INTERVAL=5000
 
 # ==============================================================================
 
@@ -86,6 +86,8 @@ apptainer exec \
             model.hybrid_override_pattern=\"MEME*ME\" \
             model.num_moe_experts=8 \
             model.routing_type=$ROUTING_TYPE \
+            model.moe_topany_target_k=3.5 \
+            model.moe_topany_update_rate=0.01 \
             model.tensor_model_parallel_size=1 \
             model.expert_model_parallel_size=1 \
             model.sequence_parallel=False \
