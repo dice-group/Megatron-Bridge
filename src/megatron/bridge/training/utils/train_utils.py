@@ -623,10 +623,42 @@ def training_log(
         if config.model.moe_z_loss_coeff is not None:
             track_names.append("z_loss")
 
+        layers = config.model.num_layers
+        moe_layer_freq = config.model.moe_layer_freq
+        mtp_num_layers = config.model.mtp_num_layers
+
+        # For hybrid models, derive moe_layer_freq from the pattern so
+        # track_moe_metrics counts only actual MoE layers, not all layers.
         if config.model.is_hybrid_model:
-            layers = config.model.hybrid_override_pattern.count("E")
-        else:
-            layers = config.model.num_layers
+            pattern = config.model.hybrid_override_pattern
+            moe_layer_freq = [1 if c == "E" else 0 for c in pattern]
+
+        # Fold MTP layers into moe_layer_freq so that both the tracker tensor
+        # size and the MoE-layer divisor are correct.  The upstream function
+        # blindly adds mtp_num_layers to both, which overcounts when not every
+        # MTP layer is an MoE layer.
+        if mtp_num_layers is not None:
+            mtp_pattern = getattr(config.model, "mtp_hybrid_override_pattern", None)
+            if mtp_pattern:
+                mtp_freq = [1 if c == "E" else 0 for c in mtp_pattern]
+            else:
+                # Non-hybrid MTP: assume every MTP layer is MoE
+                mtp_freq = [1] * mtp_num_layers
+
+            if moe_layer_freq is None:
+                # All decoder layers are MoE (non-hybrid, no moe_layer_freq set)
+                moe_layer_freq = [1] * layers + mtp_freq
+            elif isinstance(moe_layer_freq, int):
+                moe_layer_freq = [
+                    1 if (i % moe_layer_freq == 0) else 0 for i in range(layers)
+                ] + mtp_freq
+            else:
+                moe_layer_freq = list(moe_layer_freq) + mtp_freq
+
+            # Expand num_layers to cover decoder + MTP; set mtp_num_layers to
+            # None so the upstream function doesn't double-count.
+            layers += mtp_num_layers
+            mtp_num_layers = None
 
         track_moe_metrics(
             loss_scale=moe_loss_scale,
@@ -638,8 +670,8 @@ def training_log(
             force_initialize=True,
             track_names=track_names,
             num_layers=layers,
-            moe_layer_freq=config.model.moe_layer_freq,
-            mtp_num_layers=config.model.mtp_num_layers,
+            moe_layer_freq=moe_layer_freq,
+            mtp_num_layers=mtp_num_layers,
             pg_collection=pg_collection,
         )
     if config.model.mtp_num_layers is not None:

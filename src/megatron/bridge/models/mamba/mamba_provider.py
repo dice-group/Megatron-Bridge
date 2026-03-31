@@ -12,6 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import copy
 import logging
 import warnings
 from dataclasses import dataclass, field
@@ -66,6 +67,38 @@ def transformer_engine_mamba_stack_spec() -> ModuleSpec:
     return default_mamba_stack_spec
 
 
+def _get_router_class(routing_type: str):
+    """Return the router class for the given routing type.
+
+    Args:
+        routing_type: One of "topany", "lossfree", "topk".
+
+    Returns:
+        The router class to use in the MoE module spec.
+    """
+    if routing_type == "topany":
+        from megatron.core.transformer.moe.gate import TopAnyRouter
+        return TopAnyRouter
+    elif routing_type == "lossfree":
+        from megatron.core.transformer.moe.gate import LossFreeTopAnyRouter
+        return LossFreeTopAnyRouter
+    elif routing_type == "topk":
+        from megatron.core.transformer.moe.router import TopKRouter
+        return TopKRouter
+    else:
+        raise ValueError(
+            f"Unknown routing_type '{routing_type}'. Expected one of: topany, lossfree, topk"
+        )
+
+
+def _swap_moe_router(spec: ModuleSpec, router_class) -> ModuleSpec:
+    """Return a copy of the mamba stack spec with the MoE router class replaced."""
+    spec = copy.deepcopy(spec)
+    moe_mlp_spec = spec.submodules.moe_layer.submodules.mlp
+    moe_mlp_spec.submodules.router = router_class
+    return spec
+
+
 def get_default_mamba_stack_spec(config: "MambaModelProvider") -> ModuleSpec:
     """Determine the most appropriate Mamba stack specification based on configuration.
 
@@ -75,7 +108,12 @@ def get_default_mamba_stack_spec(config: "MambaModelProvider") -> ModuleSpec:
     Returns:
         ModuleSpec: Appropriate module specification based on config
     """
-    return transformer_engine_mamba_stack_spec()
+    spec = transformer_engine_mamba_stack_spec()
+    routing_type = getattr(config, "routing_type", "topany")
+    if routing_type != "topany":
+        router_class = _get_router_class(routing_type)
+        spec = _swap_moe_router(spec, router_class)
+    return spec
 
 
 @dataclass
@@ -126,6 +164,9 @@ class MambaModelProvider(TransformerConfig, ModelProviderMixin[MCoreMambaModel])
     hf_model_id: Optional[str] = None
     _pg_collection: Optional[ProcessGroupCollection] = None
     
+    # MoE routing
+    routing_type: str = "topany"  # "topany", "lossfree", or "topk"
+
     # MTP
     mtp_num_layers: int = 0
     mtp_hybrid_override_pattern: Optional[str] = None
