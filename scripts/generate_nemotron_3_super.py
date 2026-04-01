@@ -202,6 +202,13 @@ def main():
     print_rank_0(f"Loading checkpoint from: {cfg.checkpoint.load}")
     load_checkpoint(state, model, None, None)
 
+    # Reset MTP config after checkpoint load — the checkpoint restores the training
+    # config (mtp_num_layers > 0) but we built the model without MTP layers.
+    for m in model:
+        inner = m.module if hasattr(m, 'module') else m
+        if hasattr(inner, 'config'):
+            inner.config.mtp_num_layers = 0
+
     model = [m.cuda() for m in model]
     for m in model:
         m.eval()
