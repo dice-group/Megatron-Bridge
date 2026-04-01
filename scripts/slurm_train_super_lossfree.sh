@@ -27,6 +27,10 @@ fi
 # Routing type: "topany", "lossfree", or "topk"
 ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 
+# Token budget: 0 = train for one full epoch over the training split (default).
+# Set to a positive integer to train on exactly that many tokens (must be ≤ epoch tokens).
+TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
+
 # Parallelism — defaults to data parallelism only on 4 GPUs
 N_GPUS=4
 TP=1
@@ -34,6 +38,7 @@ EP=1
 CP=1
 MICRO_BATCH_SIZE=4
 GRAD_ACCUM_STEPS=1
+SEQ_LENGTH=2048
 
 # Derived
 DP=$(( N_GPUS / (TP * EP * CP) ))
@@ -46,8 +51,37 @@ GLOBAL_BATCH_SIZE=$(( DP * MICRO_BATCH_SIZE * GRAD_ACCUM_STEPS ))
 CONTAINER="$PWD/../nemo-container"
 BLEND_PATH="$DATA_DIR/blend.json"
 
-TRAIN_ITERS=1043496
-LR_WARMUP_ITERS=104349
+# Compute train_iters from the tokenized .idx file so we do exactly 1 epoch
+# (or the user-specified token budget).
+read TRAIN_ITERS LR_WARMUP_ITERS EPOCH_TOKENS EFFECTIVE_TOKENS <<< $(python3 -c "
+import numpy as np, struct, sys
+
+def count_tokens(idx_path):
+    with open(idx_path, 'rb') as f:
+        f.read(18)  # magic(9) + version(8) + dtype(1)
+        seq_count = struct.unpack('<Q', f.read(8))[0]
+        f.read(8)   # doc_count
+        lengths = np.frombuffer(f.read(seq_count * 4), dtype=np.int32)
+        return int(np.sum(lengths))
+
+epoch_tokens = count_tokens('${DATA_DIR}/fineweb_train_text_document.idx')
+train_tokens = ${TRAIN_TOKENS}
+seq_length   = ${SEQ_LENGTH}
+gbs          = ${GLOBAL_BATCH_SIZE}
+
+if train_tokens == 0:
+    train_tokens = epoch_tokens
+elif train_tokens > epoch_tokens:
+    print(f'ERROR: TRAIN_TOKENS ({train_tokens:,}) exceeds epoch tokens ({epoch_tokens:,})', file=sys.stderr)
+    sys.exit(1)
+
+tokens_per_iter = gbs * seq_length
+train_iters     = train_tokens // tokens_per_iter
+warmup_iters    = train_iters // 10
+
+print(train_iters, warmup_iters, epoch_tokens, train_tokens)
+")
+
 SAVE_INTERVAL=5000
 
 # ==============================================================================
@@ -65,7 +99,8 @@ echo "Data dir  : $DATA_DIR"
 echo "Blend     : $BLEND_PATH"
 echo "Checkpoint: $CHECKPOINT_DIR"
 echo "Routing   : $ROUTING_TYPE"
-echo "Iters     : $TRAIN_ITERS"
+echo "Tokens    : $EFFECTIVE_TOKENS / $EPOCH_TOKENS (epoch)"
+echo "Iters     : $TRAIN_ITERS (warmup=$LR_WARMUP_ITERS)"
 echo "GPUs      : $N_GPUS (DP=$DP, TP=$TP, EP=$EP, CP=$CP)"
 echo "Batch     : global=$GLOBAL_BATCH_SIZE micro=$MICRO_BATCH_SIZE grad_accum=$GRAD_ACCUM_STEPS"
 echo "=============================="
@@ -106,8 +141,8 @@ apptainer exec \
             model.expert_model_parallel_size=$EP \
             model.sequence_parallel=False \
             model.context_parallel_size=$CP \
-            model.seq_length=2048 \
-            dataset.sequence_length=2048 \
+            model.seq_length=$SEQ_LENGTH \
+            dataset.sequence_length=$SEQ_LENGTH \
             checkpoint.save=$CHECKPOINT_DIR \
             checkpoint.save_interval=$SAVE_INTERVAL
     "
