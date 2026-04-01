@@ -101,7 +101,7 @@ apptainer exec \
             model.num_moe_experts=8 \
             model.routing_type=$ROUTING_TYPE \
             model.moe_topany_target_k=3.5 \
-            model.moe_topany_update_rate=0.01 \
+            model.moe_topany_update_rate=0.001 \
             model.tensor_model_parallel_size=$TP \
             model.expert_model_parallel_size=$EP \
             model.sequence_parallel=False \
