@@ -162,6 +162,7 @@ srun --ntasks-per-node=1 \
             model.tensor_model_parallel_size=$TP \
             model.pipeline_model_parallel_size=1 \
             model.expert_model_parallel_size=$EP \
+            model.moe_token_dispatcher_type=alltoall \
             model.sequence_parallel=False \
             model.context_parallel_size=$CP \
             model.seq_length=$SEQ_LENGTH \

@@ -161,6 +161,7 @@ srun --ntasks-per-node=1 \
             model.moe_topany_update_rate=0.001 \
             model.tensor_model_parallel_size=$TP \
             model.expert_model_parallel_size=$EP \
+            model.moe_token_dispatcher_type=alltoall \
             model.sequence_parallel=False \
             model.context_parallel_size=$CP \
             model.seq_length=$SEQ_LENGTH \
