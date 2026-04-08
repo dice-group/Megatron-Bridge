@@ -42,8 +42,8 @@ EP=4
 CP=1
 
 # NVIDIA uses a massive global batch size of 3072 for optimal utilization
-MICRO_BATCH_SIZE=8
-SEQ_LENGTH=2048
+MICRO_BATCH_SIZE=4
+SEQ_LENGTH=8192
 DP=$(( N_GPUS / (TP * CP) )) # 32 / 4 = 8 DP groups
 GRAD_ACCUM_STEPS=$(( 3072 / (DP * MICRO_BATCH_SIZE) )) # 3072 / 16 = 192 steps
 
@@ -164,11 +164,14 @@ srun --ntasks-per-node=1 \
             model.moe_topany_update_rate=0.001 \
             model.tensor_model_parallel_size=$TP \
             model.expert_model_parallel_size=$EP \
-            model.moe_token_dispatcher_type=alltoall \
+            model.moe_token_dispatcher_type=flex \
+            model.moe_flex_dispatcher_backend=deepep \
             model.sequence_parallel=True \
             model.context_parallel_size=$CP \
             model.seq_length=$SEQ_LENGTH \
             dataset.sequence_length=$SEQ_LENGTH \
+            comm_overlap.tp_comm_overlap=True \
+            comm_overlap.tp_comm_bootstrap_backend=nccl \
             checkpoint.save=$CHECKPOINT_DIR \
             checkpoint.save_interval=$SAVE_INTERVAL
     "
