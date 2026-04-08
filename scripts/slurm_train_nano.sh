@@ -38,12 +38,12 @@ NNODES=8
 GPUS_PER_NODE=4
 N_GPUS=$(( NNODES * GPUS_PER_NODE ))
 TP=4
-EP=4
+EP=8
 CP=1
 
 # NVIDIA uses a massive global batch size of 3072 for optimal utilization
 MICRO_BATCH_SIZE=4
-SEQ_LENGTH=8192
+SEQ_LENGTH=4096
 DP=$(( N_GPUS / (TP * CP) )) # 32 / 4 = 8 DP groups
 GRAD_ACCUM_STEPS=$(( 3072 / (DP * MICRO_BATCH_SIZE) )) # 3072 / 16 = 192 steps
 
