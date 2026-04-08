@@ -22,8 +22,8 @@ from typing import Tuple
 import torch
 from omegaconf import OmegaConf
 
-from megatron.bridge.recipes.nemotronh.nemotron_3_nano import (
-    nemotron_3_nano_pretrain_config as pretrain_config,
+from megatron.bridge.recipes.qwen.qwen3_moe import (
+    qwen3_30b_a3b_pretrain_config as pretrain_config,
 )
 from megatron.bridge.training.config import ConfigContainer
 from megatron.bridge.training.gpt_step import forward_step
@@ -41,7 +41,7 @@ logger: logging.Logger = logging.getLogger(__name__)
 def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
     """Parse command line arguments, separating known script args from OmegaConf overrides."""
     parser = argparse.ArgumentParser(
-        description="Pretrain Nemotron 3 Nano model using Megatron-Bridge with YAML and CLI overrides",
+        description="Pretrain Qwen3 MoE 30B-A3B model using Megatron-Bridge with YAML and CLI overrides",
         formatter_class=argparse.RawTextHelpFormatter,
     )
     parser.add_argument(
@@ -58,7 +58,7 @@ def parse_cli_args() -> Tuple[argparse.Namespace, list[str]]:
 
 def main() -> None:
     """
-    Entry point for the Nemotron 3 Nano pretraining script.
+    Entry point for the Qwen3 MoE 30B-A3B pretraining script.
     """
     args, cli_overrides = parse_cli_args()
 

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 import contextlib
+import copy
 import inspect
 import logging
 from dataclasses import dataclass, field
@@ -121,6 +122,40 @@ def default_layer_spec(config: "GPTModelProvider") -> ModuleSpec:
         return transformer_engine_layer_spec(config)
 
 
+def _get_router_class(routing_type: str):
+    """Return the router class for the given routing type.
+
+    Args:
+        routing_type: One of "topany", "lossfree", "topk".
+
+    Returns:
+        The router class to use in the MoE module spec.
+    """
+    if routing_type == "topany":
+        from megatron.core.transformer.moe.gate import TopAnyRouter
+
+        return TopAnyRouter
+    elif routing_type == "lossfree":
+        from megatron.core.transformer.moe.gate import LossFreeTopAnyRouter
+
+        return LossFreeTopAnyRouter
+    elif routing_type == "topk":
+        from megatron.core.transformer.moe.router import TopKRouter
+
+        return TopKRouter
+    else:
+        raise ValueError(f"Unknown routing_type '{routing_type}'. Expected one of: topany, lossfree, topk")
+
+
+def _swap_gpt_moe_router(spec: ModuleSpec, router_class) -> ModuleSpec:
+    """Return a copy of the GPT layer spec with the MoE router class replaced."""
+    spec = copy.deepcopy(spec)
+    mlp_spec = spec.submodules.mlp
+    if hasattr(mlp_spec, "submodules") and hasattr(mlp_spec.submodules, "router"):
+        mlp_spec.submodules.router = router_class
+    return spec
+
+
 @dataclass
 class GPTModelProvider(TransformerConfig, ModelProviderMixin[MCoreGPTModel]):
     """Configuration and provider for Megatron Core GPT models.
@@ -169,6 +204,9 @@ class GPTModelProvider(TransformerConfig, ModelProviderMixin[MCoreGPTModel]):
     qk_layernorm: bool = False
     fp8: Optional[str] = None
     normalization: str = "LayerNorm"
+
+    # MoE routing
+    routing_type: str = "topany"  # "topany", "lossfree", or "topk"
 
     # Multi-token prediction
     mtp_enabled: bool = False
@@ -240,6 +278,12 @@ class GPTModelProvider(TransformerConfig, ModelProviderMixin[MCoreGPTModel]):
                 transformer_layer_spec = transformer_layer_spec(self, vp_stage=vp_stage)
             else:
                 transformer_layer_spec = transformer_layer_spec(self)
+
+        # Swap MoE router class if routing_type is not the default
+        routing_type = getattr(self, "routing_type", "topany")
+        if routing_type != "topany" and self.num_moe_experts:
+            router_class = _get_router_class(routing_type)
+            transformer_layer_spec = _swap_gpt_moe_router(transformer_layer_spec, router_class)
 
         assert self.vocab_size is not None, "vocab_size must be configured before calling provide()"
         if self.should_pad_vocab:
