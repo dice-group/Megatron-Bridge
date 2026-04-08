@@ -22,14 +22,15 @@ HF_MODEL=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/hf-tokenizer
 OUTPUT_DIR=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/data/fineweb
 
 # FineWeb dataset config name. Options:
-#   sample-10BT   ~20 GB tokenized
+#   sample-10BT   ~20 GB tokenized   (quick testing)
 #   sample-100BT  ~200 GB tokenized
-#   sample-350BT  ~700 GB tokenized  (default)
+#   sample-350BT  ~700 GB tokenized
 #   default       full ~15T-token dataset (~30 TB tokenized)
-DATASET_NAME="sample-350BT"
+DATASET_NAME="sample-10BT"
 
 # Number of documents to download: 0 = download ALL documents in DATASET_NAME.
-NUM_SAMPLES=0
+# 3M docs ≈ 1.5B tokens ≈ ~10h training on 4×H100 (GBS=16, seq=2048)
+NUM_SAMPLES=3000000
 
 # Parallel workers for downloading and tokenization
 WORKERS=32
