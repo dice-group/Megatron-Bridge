@@ -138,6 +138,7 @@ srun --ntasks-per-node=1 \
         export HOME=/tmp
         export MASTER_ADDR=$MASTER_ADDR
         export MASTER_PORT=$MASTER_PORT
+        export UB_SKIPMC=1
 
         torchrun \
             --nnodes=$NNODES \
