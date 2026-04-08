@@ -32,19 +32,21 @@ ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
 
 # Parallelism — Nemotron 3 Nano (30B, 128 experts, 52 layers)
-# TP=2 shards shared params; EP=8 distributes 128 experts (16 per EP group)
-NNODES=4
+# NVIDIA Pretraining Default: 32 GPUs total. TP=4, EP=8, PP=1, CP=1. 
+# TP=4 fits perfectly on your 4-GPU nodes. EP=8 distributes across nodes.
+NNODES=8
 GPUS_PER_NODE=4
 N_GPUS=$(( NNODES * GPUS_PER_NODE ))
-TP=2
+TP=4
 EP=8
 CP=1
-MICRO_BATCH_SIZE=1
-GRAD_ACCUM_STEPS=1
-SEQ_LENGTH=2048
 
-# Derived — EP is orthogonal to DP (does not reduce data parallelism)
-DP=$(( N_GPUS / (TP * CP) ))
+# NVIDIA uses a massive global batch size of 3072 for optimal utilization
+MICRO_BATCH_SIZE=2
+SEQ_LENGTH=2048
+DP=$(( N_GPUS / (TP * CP) )) # 32 / 4 = 8 DP groups
+GRAD_ACCUM_STEPS=$(( 3072 / (DP * MICRO_BATCH_SIZE) )) # 3072 / 16 = 192 steps
+
 GLOBAL_BATCH_SIZE=$(( DP * MICRO_BATCH_SIZE * GRAD_ACCUM_STEPS ))
 
 # ==============================================================================
