@@ -1,13 +1,13 @@
 #!/bin/bash
 
 #SBATCH --job-name=qwen3-moe
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=32
 #SBATCH --time=24:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:h100:4
-#SBATCH --mem=64GB
+#SBATCH --mem=128GB
 #SBATCH --account=hpc-prf-merlin
 #SBATCH --output=logs/train_%j.out
 #SBATCH --error=logs/train_%j.err
@@ -32,10 +32,12 @@ ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
 
 # Parallelism — Qwen3 MoE 30B-A3B (48 layers, 128 experts)
-# EP=4 distributes 128 experts across 4 GPUs (32 per GPU)
-N_GPUS=4
+# EP=8 distributes 128 experts across 8 GPUs (16 per GPU)
+NNODES=2
+GPUS_PER_NODE=4
+N_GPUS=$(( NNODES * GPUS_PER_NODE ))
 TP=1
-EP=4
+EP=8
 CP=1
 MICRO_BATCH_SIZE=1
 GRAD_ACCUM_STEPS=1
@@ -119,7 +121,12 @@ echo "=============================="
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export NCCL_NVLS_ENABLE=0
 
-apptainer exec \
+# Multi-node: resolve master address from first SLURM node
+export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
+export MASTER_PORT=${MASTER_PORT:-29500}
+
+srun --ntasks-per-node=1 \
+    apptainer exec \
     --nv \
     --no-home \
     --bind "$PWD":/opt/Megatron-Bridge \
@@ -129,8 +136,15 @@ apptainer exec \
     "$CONTAINER" \
     bash -c "
         export HOME=/tmp
+        export MASTER_ADDR=$MASTER_ADDR
+        export MASTER_PORT=$MASTER_PORT
 
-        torchrun --nproc-per-node=$N_GPUS \
+        torchrun \
+            --nnodes=$NNODES \
+            --nproc-per-node=$GPUS_PER_NODE \
+            --node-rank=\$SLURM_NODEID \
+            --master-addr=$MASTER_ADDR \
+            --master-port=$MASTER_PORT \
             examples/models/qwen/pretrain_qwen3_moe_30b.py \
             --per-split-data-args-path=$BLEND_PATH \
             logger.wandb_project=variable-moe-routing \
