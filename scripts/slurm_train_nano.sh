@@ -38,7 +38,7 @@ NNODES=8
 GPUS_PER_NODE=4
 N_GPUS=$(( NNODES * GPUS_PER_NODE ))
 TP=4
-EP=8
+EP=4
 CP=1
 
 # NVIDIA uses a massive global batch size of 3072 for optimal utilization
