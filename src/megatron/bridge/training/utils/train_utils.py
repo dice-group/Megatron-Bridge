@@ -682,8 +682,16 @@ def training_log(
         elapsed_time = timers("interval-time").elapsed(barrier=True)
         elapsed_time_per_iteration = elapsed_time / total_iterations
 
-        # Calculate GPU utilization
-        num_flops = num_floating_point_operations(config, batch_size)
+        # Calculate GPU utilization.
+        # For variable-k routers (TopAny / LossFree), use the actual mean k
+        # from this step so that TFLOP/s reflects the real computation.
+        _k_override = None
+        if "topany_k_mean" in total_loss_dict:
+            _k_val = total_loss_dict["topany_k_mean"]
+            _k_override = _k_val.item() if hasattr(_k_val, "item") else float(_k_val)
+        num_flops = num_floating_point_operations(
+            config, batch_size, num_experts_routed_to_override=_k_override
+        )
         per_gpu_tf = num_flops / elapsed_time_per_iteration / get_world_size_safe() / 1e12
         print_rank_0(
             f"Step Time : {elapsed_time_per_iteration:.2f}s GPU utilization: {per_gpu_tf:.1f}MODEL_TFLOP/s/GPU"

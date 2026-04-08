@@ -26,8 +26,19 @@ from megatron.bridge.utils.vocab_utils import calculate_padded_vocab_size
 _lora_seq_stats_cache: dict = {}
 
 
-def num_floating_point_operations(cfg: ConfigContainer, batch_size: int = 1):
-    """Return the number of floating point operations"""
+def num_floating_point_operations(
+    cfg: ConfigContainer, batch_size: int = 1, num_experts_routed_to_override: float | None = None
+):
+    """Return the number of floating point operations.
+
+    Args:
+        cfg: The configuration container.
+        batch_size: The batch size.
+        num_experts_routed_to_override: If set, overrides the static ``moe_router_topk``
+            value used for MoE FLOP accounting.  Useful for variable-k routing
+            (e.g. TopAny / LossFree routers) where the actual number of experts
+            activated per token changes every step.
+    """
     peft = getattr(cfg, "peft", None)
     is_lora = isinstance(peft, LoRA)
     # If the model provider has a custom TFLOPS calculation method, use it (non-LoRA only).
@@ -271,7 +282,11 @@ def num_floating_point_operations(cfg: ConfigContainer, batch_size: int = 1):
             )
             num_moe_layers = sum(moe_layer_pattern)  # Number of 1s in `moe_layer_pattern`.
             num_dense_layers = cfg.model.num_layers - num_moe_layers
-            num_experts_routed_to = getattr(cfg.model, "moe_router_topk", 1)
+            num_experts_routed_to = (
+                num_experts_routed_to_override
+                if num_experts_routed_to_override is not None
+                else getattr(cfg.model, "moe_router_topk", 1)
+            )
             last_layer_is_moe = moe_layer_pattern[-1]
 
         if cfg.model.mtp_num_layers is not None:
@@ -482,7 +497,11 @@ def num_floating_point_operations(cfg: ConfigContainer, batch_size: int = 1):
                 if getattr(cfg.model, "moe_shared_expert_intermediate_size", None) is None
                 else cfg.model.moe_shared_expert_intermediate_size
             ),
-            num_experts_routed_to=getattr(cfg.model, "moe_router_topk", 1),
+            num_experts_routed_to=(
+                num_experts_routed_to_override
+                if num_experts_routed_to_override is not None
+                else getattr(cfg.model, "moe_router_topk", 1)
+            ),
             vocab_size=padded_vocab_size,
             mtp_num_layers=mtp_num_layers,
         )

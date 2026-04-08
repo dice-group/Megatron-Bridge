@@ -256,7 +256,6 @@ def train(
 
     start_iteration = global_state.train_state.step
     print_rank_0(f"Starting training loop at iteration {start_iteration}")
-    num_floating_point_operations_model = flop_utils.num_floating_point_operations(config, batch_size=1)
     p2p_communicator = P2PCommunicator(pp_group=pg_collection.pp, config=model_config)
     dp_size = pg_collection.dp.size()
 
@@ -461,7 +460,18 @@ def train(
         else:
             assert num_skipped_samples_in_batch == 0
         global_state.train_state.skipped_train_samples += num_skipped_samples_in_batch
-        num_floating_point_operations_in_batch = num_floating_point_operations_model * batch_size
+        # For variable-k routers, use the dynamic k from the previous step's
+        # logging (falls back to static config on the first iteration).
+        _k_override = None
+        if "topany_k_mean" in total_loss_dict:
+            _k_val = total_loss_dict["topany_k_mean"]
+            _k_override = _k_val.item() if hasattr(_k_val, "item") else float(_k_val)
+        num_floating_point_operations_in_batch = (
+            flop_utils.num_floating_point_operations(
+                config, batch_size=1, num_experts_routed_to_override=_k_override
+            )
+            * batch_size
+        )
         global_state.train_state.floating_point_operations_so_far += num_floating_point_operations_in_batch
         num_floating_point_operations_so_far = global_state.train_state.floating_point_operations_so_far
         num_floating_point_operations_since_last_log_event += num_floating_point_operations_in_batch
