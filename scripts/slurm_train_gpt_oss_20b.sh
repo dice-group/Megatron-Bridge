@@ -54,6 +54,7 @@ BLEND_PATH="$DATA_DIR/blend.json"
 
 # Compute train_iters from the tokenized .idx file so we do exactly 1 epoch
 # (or the user-specified token budget).
+_ITER_CALC_ERR=$(mktemp)
 read TRAIN_ITERS LR_WARMUP_ITERS EPOCH_TOKENS EFFECTIVE_TOKENS <<< $(python3 -c "
 import numpy as np, struct, sys
 
@@ -81,7 +82,15 @@ train_iters     = train_tokens // tokens_per_iter
 warmup_iters    = train_iters // 10
 
 print(train_iters, warmup_iters, epoch_tokens, train_tokens)
-")
+" 2>"$_ITER_CALC_ERR")
+
+if [ -z "$TRAIN_ITERS" ] || ! [[ "$TRAIN_ITERS" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: Failed to compute TRAIN_ITERS (got '$TRAIN_ITERS')."
+    echo "Python stderr:" && cat "$_ITER_CALC_ERR"
+    rm -f "$_ITER_CALC_ERR"
+    exit 1
+fi
+rm -f "$_ITER_CALC_ERR"
 
 SAVE_INTERVAL=5000
 
