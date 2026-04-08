@@ -41,8 +41,8 @@ MICRO_BATCH_SIZE=1
 GRAD_ACCUM_STEPS=1
 SEQ_LENGTH=2048
 
-# Derived
-DP=$(( N_GPUS / (TP * EP * CP) ))
+# Derived — EP is orthogonal to DP (does not reduce data parallelism)
+DP=$(( N_GPUS / (TP * CP) ))
 GLOBAL_BATCH_SIZE=$(( DP * MICRO_BATCH_SIZE * GRAD_ACCUM_STEPS ))
 
 # ==============================================================================
