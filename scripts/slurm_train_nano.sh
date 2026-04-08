@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #SBATCH --job-name=nano-moe
-#SBATCH --nodes=1
+#SBATCH --nodes=2
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
 #SBATCH --time=24:00:00
@@ -32,10 +32,10 @@ ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
 
 # Parallelism — Nemotron 3 Nano (30B, 128 experts, 52 layers)
-# EP=4 distributes 128 experts across 4 GPUs (32 per GPU)
-N_GPUS=4
-TP=4
-EP=1
+# EP=8 distributes 128 experts across 8 GPUs (16 per GPU)
+N_GPUS=8
+TP=1
+EP=8
 CP=1
 MICRO_BATCH_SIZE=1
 GRAD_ACCUM_STEPS=1
