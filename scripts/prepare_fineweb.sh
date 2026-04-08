@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=32
-#SBATCH --time=72:00:00
+#SBATCH --time=04:00:00
 #SBATCH --partition=normal
 #SBATCH --mem=128GB
 #SBATCH --account=hpc-prf-merlin

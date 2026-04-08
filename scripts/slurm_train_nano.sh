@@ -34,8 +34,8 @@ TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
 # Parallelism — Nemotron 3 Nano (30B, 128 experts, 52 layers)
 # EP=4 distributes 128 experts across 4 GPUs (32 per GPU)
 N_GPUS=4
-TP=1
-EP=4
+TP=2
+EP=2
 CP=1
 MICRO_BATCH_SIZE=1
 GRAD_ACCUM_STEPS=1
