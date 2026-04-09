@@ -34,10 +34,10 @@ TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
 # Parallelism — defaults to data parallelism only on 4 GPUs
 N_GPUS=4
 TP=1
-EP=1
+EP=4
 CP=1
-MICRO_BATCH_SIZE=8
-GRAD_ACCUM_STEPS=4
+MICRO_BATCH_SIZE=16
+GRAD_ACCUM_STEPS=8
 SEQ_LENGTH=2048
 
 # Derived
