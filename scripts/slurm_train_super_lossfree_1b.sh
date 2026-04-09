@@ -37,7 +37,7 @@ TP=1
 EP=1
 CP=1
 MICRO_BATCH_SIZE=8
-GRAD_ACCUM_STEPS=1
+GRAD_ACCUM_STEPS=4
 SEQ_LENGTH=2048
 
 # Derived
@@ -135,6 +135,16 @@ apptainer exec \
             logger.wandb_entity=lukefriedrichs-paderborn-university \
             logger.log_interval=1 \
             model.moe_per_layer_logging=True \
+            model.moe_grouped_gemm=True \
+            model.moe_permute_fusion=True \
+            model.moe_router_fusion=True \
+            model.moe_shared_expert_overlap=True \
+            model.check_for_nan_in_grad=False \
+            model.recompute_granularity=selective \
+            model.recompute_modules=[core_attn,moe_act] \
+            dataset.num_workers=4 \
+            dataset.persistent_workers=True \
+            dataset.mmap_bin_files=True \
             mixed_precision=bf16_with_fp8_current_scaling_mixed \
             train.global_batch_size=$GLOBAL_BATCH_SIZE \
             train.micro_batch_size=$MICRO_BATCH_SIZE \
