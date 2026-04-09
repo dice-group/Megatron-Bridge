@@ -27,6 +27,9 @@ fi
 # Routing type: "topany", "lossfree", or "topk"
 ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 
+# Threshold update mode: "sign" or "magnitude" (only applies to lossfree routing)
+THRESHOLD_UPDATE_MODE="${THRESHOLD_UPDATE_MODE:-sign}"
+
 # Token budget: 0 = train for one full epoch over the training split (default).
 # Set to a positive integer to train on exactly that many tokens (must be ≤ epoch tokens).
 TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
@@ -112,6 +115,9 @@ echo "Tokens    : $EFFECTIVE_TOKENS / $EPOCH_TOKENS (epoch)"
 echo "Iters     : $TRAIN_ITERS (warmup=$LR_WARMUP_ITERS)"
 echo "GPUs      : $N_GPUS (DP=$DP, TP=$TP, EP=$EP, CP=$CP)"
 echo "Batch     : global=$GLOBAL_BATCH_SIZE micro=$MICRO_BATCH_SIZE grad_accum=$GRAD_ACCUM_STEPS"
+echo "Model     : Nemotron-3 Super 1B (Loss-Free MoE)"
+echo "Vocab Size: 131072"
+echo "Init Loss : 11.7835"
 echo "=============================="
 
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
@@ -159,6 +165,7 @@ apptainer exec \
             model.routing_type=$ROUTING_TYPE \
             model.moe_topany_target_k=6 \
             model.moe_topany_update_rate=0.001 \
+            model.moe_topany_threshold_update_mode=${THRESHOLD_UPDATE_MODE:-sign} \
             model.tensor_model_parallel_size=$TP \
             model.expert_model_parallel_size=$EP \
             model.sequence_parallel=False \
@@ -169,6 +176,7 @@ apptainer exec \
             checkpoint.save_interval=$SAVE_INTERVAL
     "
 
+echo "=============================="
 echo "=============================="
 echo "Job finished"
 echo "=============================="

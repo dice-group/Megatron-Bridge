@@ -27,6 +27,9 @@ fi
 # Routing type: "topany", "lossfree", or "topk"
 ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 
+# Threshold update mode: "sign" or "magnitude" (only applies to lossfree routing)
+THRESHOLD_UPDATE_MODE="${THRESHOLD_UPDATE_MODE:-sign}"
+
 # Token budget: 0 = train for one full epoch over the training split (default).
 # Set to a positive integer to train on exactly that many tokens (must be ≤ epoch tokens).
 TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
@@ -114,6 +117,8 @@ echo "Iters     : $TRAIN_ITERS (warmup=$LR_WARMUP_ITERS)"
 echo "GPUs      : $N_GPUS (DP=$DP, TP=$TP, EP=$EP, CP=$CP)"
 echo "Batch     : global=$GLOBAL_BATCH_SIZE micro=$MICRO_BATCH_SIZE grad_accum=$GRAD_ACCUM_STEPS"
 echo "Model     : GPT OSS 1B (12 layers, 32 experts, top-4, scaled from 20B)"
+echo "Vocab Size: 201088"
+echo "Init Loss : 12.2115"
 echo "=============================="
 
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
@@ -155,6 +160,7 @@ apptainer exec \
             model.routing_type=$ROUTING_TYPE \
             model.moe_topany_target_k=4 \
             model.moe_topany_update_rate=0.001 \
+            model.moe_topany_threshold_update_mode=${THRESHOLD_UPDATE_MODE:-sign} \
             model.tensor_model_parallel_size=$TP \
             model.pipeline_model_parallel_size=1 \
             model.expert_model_parallel_size=$EP \
