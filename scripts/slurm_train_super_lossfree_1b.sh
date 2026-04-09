@@ -151,7 +151,7 @@ apptainer exec \
             model.moe_router_topk=6 \
             model.num_attention_heads=10 \
             model.num_query_groups=1 \
-            model.mamba_num_heads=40 \
+            model.mamba_num_heads=32 \
             model.mamba_state_dim=32 \
             model.mamba_num_groups=2 \
             model.routing_type=$ROUTING_TYPE \
