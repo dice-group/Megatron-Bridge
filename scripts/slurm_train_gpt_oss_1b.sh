@@ -29,6 +29,7 @@ ROUTING_TYPE="${ROUTING_TYPE:-lossfree}"
 
 # Threshold update mode: "sign" or "magnitude" (only applies to lossfree routing)
 THRESHOLD_UPDATE_MODE="${THRESHOLD_UPDATE_MODE:-magnitude}"
+THRESHOLD_UPDATE_RATE="${THRESHOLD_UPDATE_RATE:-0.0001}"
 
 # Token budget: 0 = train for one full epoch over the training split (default).
 # Set to a positive integer to train on exactly that many tokens (must be ≤ epoch tokens).
@@ -159,7 +160,7 @@ apptainer exec \
             model.moe_router_topk=4 \
             model.routing_type=$ROUTING_TYPE \
             model.moe_topany_target_k=4 \
-            model.moe_topany_update_rate=0.001 \
+            model.moe_topany_update_rate=$THRESHOLD_UPDATE_RATE \
             model.moe_topany_threshold_update_mode=${THRESHOLD_UPDATE_MODE:-sign} \
             model.tensor_model_parallel_size=$TP \
             model.pipeline_model_parallel_size=1 \

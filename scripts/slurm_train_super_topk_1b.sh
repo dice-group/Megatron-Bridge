@@ -29,6 +29,7 @@ ROUTING_TYPE="topk"
 
 # Threshold update mode: "sign" or "magnitude" (only applies to lossfree routing)
 THRESHOLD_UPDATE_MODE="${THRESHOLD_UPDATE_MODE:-sign}"
+THRESHOLD_UPDATE_RATE="${THRESHOLD_UPDATE_RATE:-0.001}"
 
 # Token budget: 0 = train for one full epoch over the training split (default).
 # Set to a positive integer to train on exactly that many tokens (must be ≤ epoch tokens).
