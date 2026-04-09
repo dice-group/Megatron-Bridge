@@ -137,8 +137,6 @@ apptainer exec \
             model.moe_per_layer_logging=True \
             model.moe_grouped_gemm=True \
             model.moe_permute_fusion=True \
-            model.moe_router_fusion=True \
-            model.moe_shared_expert_overlap=True \
             model.check_for_nan_in_grad=False \
             model.recompute_granularity=selective \
             model.recompute_modules=[core_attn,moe_act] \
