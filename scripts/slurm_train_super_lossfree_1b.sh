@@ -135,7 +135,7 @@ apptainer exec \
             logger.wandb_entity=lukefriedrichs-paderborn-university \
             logger.log_interval=1 \
             model.moe_per_layer_logging=True \
-            ++precision_config=bf16_with_fp8_current_scaling_mixed \
+            mixed_precision=bf16_with_fp8_current_scaling_mixed \
             train.global_batch_size=$GLOBAL_BATCH_SIZE \
             train.micro_batch_size=$MICRO_BATCH_SIZE \
             train.train_iters=$TRAIN_ITERS \
