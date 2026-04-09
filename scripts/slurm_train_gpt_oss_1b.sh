@@ -7,7 +7,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:h100:4
-#SBATCH --mem=64GB
+#SBATCH --mem=128GB
 #SBATCH --account=hpc-prf-merlin
 #SBATCH --output=logs/train_%j.out
 #SBATCH --error=logs/train_%j.err
