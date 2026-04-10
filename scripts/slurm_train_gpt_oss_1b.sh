@@ -3,7 +3,7 @@
 # Parallelism presets
 # ─────────────────────────────────────────────────────────────────────────────
 # 4-GPU DP=4 (recommended — best throughput for 1B, no EP comm overhead):
-#   N_GPUS=4  TP=1  EP=1  CP=1  MBS=16  GAS=2   →  GBS=128
+#   N_GPUS=4  TP=1  EP=1  CP=1  MBS=8   GAS=4   →  GBS=128
 #   #SBATCH --gres=gpu:h100:4
 #
 # 4-GPU EP=4 (original — expert parallelism, higher all-to-all overhead):
@@ -55,8 +55,8 @@ N_GPUS=4
 TP=1
 EP=1
 CP=1
-MICRO_BATCH_SIZE=16
-GRAD_ACCUM_STEPS=2
+MICRO_BATCH_SIZE=8
+GRAD_ACCUM_STEPS=4
 SEQ_LENGTH=2048
 
 # Derived
