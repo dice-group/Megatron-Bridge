@@ -12,7 +12,7 @@
 #
 # 1-GPU:
 #   N_GPUS=1  TP=1  EP=1  CP=1  MBS=8   GAS=16  →  GBS=128
-#   #SBATCH --gres=gpu:h100:1
+#   #SBATCH --gres=gpu:h100:1  --mem=128GB
 # ─────────────────────────────────────────────────────────────────────────────
 
 #SBATCH --job-name=gptoss-moe-1b
@@ -22,7 +22,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:h100:4
-#SBATCH --mem=128GB
+#SBATCH --mem=256GB
 #SBATCH --account=hpc-prf-merlin
 #SBATCH --output=logs/train_%j.out
 #SBATCH --error=logs/train_%j.err
