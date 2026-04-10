@@ -1,4 +1,19 @@
 #!/bin/bash
+#
+# Parallelism presets
+# ─────────────────────────────────────────────────────────────────────────────
+# 4-GPU DP=4 (recommended — best throughput for 1B, no EP comm overhead):
+#   N_GPUS=4  TP=1  EP=1  CP=1  MBS=16  GAS=2   →  GBS=128
+#   #SBATCH --gres=gpu:h100:4
+#
+# 4-GPU EP=4 (original — expert parallelism, higher all-to-all overhead):
+#   N_GPUS=4  TP=1  EP=4  CP=1  MBS=8   GAS=16  →  GBS=128
+#   #SBATCH --gres=gpu:h100:4
+#
+# 1-GPU:
+#   N_GPUS=1  TP=1  EP=1  CP=1  MBS=8   GAS=16  →  GBS=128
+#   #SBATCH --gres=gpu:h100:1
+# ─────────────────────────────────────────────────────────────────────────────
 
 #SBATCH --job-name=gptoss-moe-1b
 #SBATCH --nodes=1
@@ -35,14 +50,13 @@ THRESHOLD_UPDATE_RATE="${THRESHOLD_UPDATE_RATE:-0.0001}"
 # Set to a positive integer to train on exactly that many tokens (must be ≤ epoch tokens).
 TRAIN_TOKENS="${TRAIN_TOKENS:-0}"
 
-# Parallelism — single node, 4 GPUs, EP=4
-# 32 experts / EP=4 = 8 experts per GPU
+# Parallelism — single node, 4 GPUs, DP=4, EP=1
 N_GPUS=4
 TP=1
-EP=4
+EP=1
 CP=1
-MICRO_BATCH_SIZE=8
-GRAD_ACCUM_STEPS=16
+MICRO_BATCH_SIZE=16
+GRAD_ACCUM_STEPS=2
 SEQ_LENGTH=2048
 
 # Derived
