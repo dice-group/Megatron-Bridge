@@ -150,6 +150,8 @@ apptainer exec \
     bash -c "
         export HOME=/tmp
 
+        pip install plotly --quiet
+
         torchrun --nproc-per-node=$N_GPUS \
             examples/models/gpt_oss/pretrain_gpt_oss_20b.py \
             --per-split-data-args-path=$BLEND_PATH \

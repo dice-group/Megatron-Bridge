@@ -127,6 +127,8 @@ apptainer exec \
     bash -c "
         export HOME=/tmp
 
+        pip install plotly --quiet
+
         torchrun --nproc-per-node=$N_GPUS \
             examples/models/nemotron_3/pretrain_nemotron_3_super.py \
             --per-split-data-args-path=$BLEND_PATH \
