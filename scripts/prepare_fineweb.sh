@@ -64,6 +64,15 @@ fi
 mkdir -p logs
 mkdir -p "$OUTPUT_DIR"
 
+# Load HF_TOKEN (and any other secrets) from .env
+if [ -f "$PWD/.env" ]; then
+    export $(grep -v '^#' "$PWD/.env" | xargs)
+fi
+
+if [ -z "${HF_TOKEN:-}" ]; then
+    echo "WARNING: HF_TOKEN not set — downloads may hit rate limits."
+fi
+
 module load tools/Apptainer/1.3.5-GCCcore-13.3.0
 
 echo "=============================="
@@ -87,6 +96,8 @@ run_python() {
     --pwd "$REPO_MOUNT" \
     "$CONTAINER" \
     env HOME=/tmp TOKENIZERS_PARALLELISM=false \
+        HF_TOKEN="${HF_TOKEN:-}" \
+        HUGGING_FACE_HUB_TOKEN="${HF_TOKEN:-}" \
     python3 "$@"
 }
 
