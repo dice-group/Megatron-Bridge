@@ -32,7 +32,8 @@
 # ==============================================================================
 
 DATA_DIR=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/data/fineweb
-CHECKPOINT_DIR=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/checkpoints_topk
+CHECKPOINT_DIR="${CHECKPOINT_DIR:-/scratch/hpc-prf-merlin/luke/Megatron-Bridge/checkpoints_topk}"
+RUN_NAME="${RUN_NAME:-super_topk_1b}"
 
 # Load WandB key from .env file
 if [ -f "$PWD/.env" ]; then
@@ -40,11 +41,15 @@ if [ -f "$PWD/.env" ]; then
 fi
 
 # Routing type: "topany", "lossfree", or "topk"
-ROUTING_TYPE="topk"
+ROUTING_TYPE="${ROUTING_TYPE:-topk}"
 
 # Threshold update mode: "sign" or "magnitude" (only applies to lossfree routing)
-THRESHOLD_UPDATE_MODE="${THRESHOLD_UPDATE_MODE:-sign}"
-THRESHOLD_UPDATE_RATE="${THRESHOLD_UPDATE_RATE:-0.001}"
+THRESHOLD_UPDATE_MODE="${THRESHOLD_UPDATE_MODE:-magnitude}"
+THRESHOLD_UPDATE_RATE="${THRESHOLD_UPDATE_RATE:-0.0001}"
+
+
+# Auxiliary load-balance loss weight (primarily used with topany routing)
+AUX_LOSS_COEFF="${AUX_LOSS_COEFF:-0}"
 
 # Token budget: 0 = train for one full epoch over the training split (default).
 # Set to a positive integer to train on exactly that many tokens (must be ≤ epoch tokens).
@@ -157,6 +162,7 @@ apptainer exec \
             --per-split-data-args-path=$BLEND_PATH \
             logger.wandb_project=variable-moe-routing \
             logger.wandb_entity=lukefriedrichs-paderborn-university \
+            logger.wandb_exp_name=$RUN_NAME \
             logger.log_interval=1 \
             model.moe_per_layer_logging=True \
             dataset.num_workers=4 \
@@ -181,6 +187,7 @@ apptainer exec \
             model.mamba_state_dim=32 \
             model.mamba_num_groups=2 \
             model.routing_type=$ROUTING_TYPE \
+            model.moe_aux_loss_coeff=$AUX_LOSS_COEFF \
             model.moe_topany_threshold_update_mode=${THRESHOLD_UPDATE_MODE:-sign} \
             model.tensor_model_parallel_size=$TP \
             model.expert_model_parallel_size=$EP \
