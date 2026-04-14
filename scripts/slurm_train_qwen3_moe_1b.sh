@@ -161,7 +161,7 @@ apptainer exec \
             model.moe_per_layer_logging=True \
             dataset.num_workers=4 \
             dataset.mmap_bin_files=True \
-            +precision_config=bf16_with_fp8_current_scaling_mixed \
+            mixed_precision=bf16_with_fp8_current_scaling_mixed \
             train.global_batch_size=$GLOBAL_BATCH_SIZE \
             train.micro_batch_size=$MICRO_BATCH_SIZE \
             train.train_iters=$TRAIN_ITERS \

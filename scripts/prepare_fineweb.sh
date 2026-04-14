@@ -29,8 +29,8 @@ OUTPUT_DIR=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/data/fineweb
 DATASET_NAME="sample-10BT"
 
 # Number of documents to download: 0 = download ALL documents in DATASET_NAME.
-# 3M docs ≈ 1.5B tokens ≈ ~10h training on 4×H100 (GBS=16, seq=2048)
-NUM_SAMPLES=3000000
+# 3M docs ≈ 1.5B tokens ≈ ~4h training on 4×H100 (GBS=16, seq=2048)
+NUM_SAMPLES=0
 
 # Parallel workers for downloading and tokenization
 WORKERS=32
@@ -271,6 +271,47 @@ else
   echo "  Cleaning up intermediate JSONL files..."
   rm -f "$OUTPUT_DIR"/fineweb_*.jsonl
 fi
+
+# ── step 2.5: log dataset stats ──────────────────────────────────────────────
+echo "[2.5/3] Computing dataset stats..."
+
+STATS_FILE="$OUTPUT_DIR/dataset_stats.txt"
+run_python - <<EOF
+import os, sys, datetime
+sys.path.insert(0, "${REPO_MOUNT}/3rdparty/Megatron-LM")
+from megatron.core.datasets.indexed_dataset import IndexedDataset
+
+output_dir = "${OUTPUT_DIR}"
+stats_path = "${STATS_FILE}"
+
+lines = []
+lines.append(f"Dataset stats — generated {datetime.datetime.now().isoformat(timespec='seconds')}")
+lines.append(f"Dataset config : ${DATASET_NAME}")
+lines.append(f"Tokenizer      : ${HF_MODEL}")
+lines.append("")
+lines.append(f"{'split':<8} {'documents':>15} {'tokens':>18}")
+lines.append("-" * 45)
+
+grand_docs = 0
+grand_toks = 0
+for split in ("train", "valid", "test"):
+    prefix = os.path.join(output_dir, f"fineweb_{split}_text_document")
+    ds = IndexedDataset(prefix)
+    num_docs = len(ds.document_indices) - 1
+    num_tokens = int(ds.sequence_lengths.sum())
+    grand_docs += num_docs
+    grand_toks += num_tokens
+    lines.append(f"{split:<8} {num_docs:>15,} {num_tokens:>18,}")
+
+lines.append("-" * 45)
+lines.append(f"{'total':<8} {grand_docs:>15,} {grand_toks:>18,}")
+
+text = "\n".join(lines) + "\n"
+with open(stats_path, "w") as f:
+    f.write(text)
+print(text)
+print(f"  Written: {stats_path}")
+EOF
 
 # ── step 3: write blend JSON ─────────────────────────────────────────────────
 echo "[3/3] Writing blend.json..."
