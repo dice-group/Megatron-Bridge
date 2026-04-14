@@ -142,10 +142,18 @@ valid_samples  = ${VALID_SAMPLES}
 test_samples   = ${TEST_SAMPLES}
 output_dir     = "${OUTPUT_DIR}"
 dataset_name   = "${DATASET_NAME}"
-num_dl_workers = min(${WORKERS}, 32)
+requested_workers = min(${WORKERS}, 32)
 
 # num_samples == 0 means unlimited (stream entire named config)
 unlimited = num_samples == 0
+
+# Cap workers at the dataset's actual parquet shard count — sharding past that
+# produces empty shards that crash with IndexError in datasets>=2.x.
+_probe = load_dataset("HuggingFaceFW/fineweb", name=dataset_name, split="train", streaming=True)
+available_shards = _probe.num_shards
+num_dl_workers = max(1, min(requested_workers, available_shards))
+if num_dl_workers < requested_workers:
+    print(f"  Dataset has only {available_shards} shards; capping workers from {requested_workers} to {num_dl_workers}")
 
 if unlimited:
     print(f"  Downloading ALL of FineWeb/{dataset_name} with {num_dl_workers} parallel workers...")
