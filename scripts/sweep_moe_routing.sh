@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# MoE routing sweep — Table 1 (36 runs: 12 configs × 3 models)
+# MoE routing sweep (36 runs: 12 configs × 3 models)
 #
 # Submits one 6-hour SLURM job per (model, routing, mode, rate) tuple.
 # Each run gets a unique wandb exp name and checkpoint dir.
@@ -9,14 +9,12 @@
 #   bash scripts/sweep_moe_routing.sh               # submit all
 #   DRY_RUN=1 bash scripts/sweep_moe_routing.sh     # print sbatch lines only
 #   MODELS=super bash scripts/sweep_moe_routing.sh  # subset: super|qwen3|gptoss
-#   SWEEPS=1,2   bash scripts/sweep_moe_routing.sh  # subset: 1, 2, 3
 
 set -euo pipefail
 
 WALLTIME="${WALLTIME:-06:00:00}"
 CKPT_ROOT="${CKPT_ROOT:-/scratch/hpc-prf-merlin/luke/Megatron-Bridge/sweep_ckpts}"
 MODELS="${MODELS:-super,qwen3,gptoss}"
-SWEEPS="${SWEEPS:-1,2,3}"
 DRY_RUN="${DRY_RUN:-0}"
 
 mkdir -p "$CKPT_ROOT" logs
@@ -28,30 +26,33 @@ declare -A SCRIPT=(
     [gptoss]=scripts/slurm_train_gpt_oss_1b.sh
 )
 
-# ── sweep configs: "sweep|routing|mode|rate|coeff|tag" ──────────────────────
+# ── sweep configs: "routing|mode|rate|coeff|tag" ────────────────────────────
 # routing: topk | topany | lossfree
 # mode:    sign | magnitude (lossfree only; "-" = default)
 # rate:    moe_topany_update_rate for lossfree; "-" = script default
 # coeff:   moe_aux_loss_coeff  (topany aux-loss weight);  "-" = 0
+#
+# topany runs OOM at the per-script default MBS, so we halve MBS and double
+# GAS for them (see submit()) — preserves global batch size.
 CONFIGS=(
-    # Sweep 1 — at default K per model (4 configs)
-    "1|topk|-|-|-|topk"
-    "1|topany|-|-|0.01|topany_c0p01"
-    "1|lossfree|sign|0.001|-|lossfree_sign_r0p001"
-    "1|lossfree|magnitude|0.0001|-|lossfree_mag_r0p0001"
-
-    # Sweep 2 — lossfree rate/mode scan (5 configs)
-    "2|lossfree|sign|0.0001|-|lossfree_sign_r0p0001"
-    "2|lossfree|sign|0.01|-|lossfree_sign_r0p01"
-    "2|lossfree|sign|0.1|-|lossfree_sign_r0p1"
-    "2|lossfree|magnitude|0.001|-|lossfree_mag_r0p001"
-    "2|lossfree|magnitude|0.01|-|lossfree_mag_r0p01"
-
-    # Sweep 3 — topany aux-loss coeff scan (3 configs)
-    "3|topany|-|-|0|topany_c0"
-    "3|topany|-|-|0.001|topany_c0p001"
-    "3|topany|-|-|0.1|topany_c0p1"
+    "topk|-|-|-|topk"
+    "topany|-|-|0.01|topany_c0p01"
+    "lossfree|sign|0.001|-|lossfree_sign_r0p001"
+    "lossfree|magnitude|0.0001|-|lossfree_mag_r0p0001"
+    "lossfree|sign|0.0001|-|lossfree_sign_r0p0001"
+    "lossfree|sign|0.01|-|lossfree_sign_r0p01"
+    "lossfree|sign|0.1|-|lossfree_sign_r0p1"
+    "lossfree|magnitude|0.001|-|lossfree_mag_r0p001"
+    "lossfree|magnitude|0.01|-|lossfree_mag_r0p01"
+    "topany|-|-|0|topany_c0"
+    "topany|-|-|0.001|topany_c0p001"
+    "topany|-|-|0.1|topany_c0p1"
 )
+
+# Per-model default (MBS, GAS) — must match the slurm script defaults.
+# Used to derive halved MBS / doubled GAS for topany runs.
+declare -A DEFAULT_MBS=( [super]=8  [qwen3]=16 [gptoss]=8 )
+declare -A DEFAULT_GAS=( [super]=4  [qwen3]=2  [gptoss]=4 )
 
 # ── helper: is value in comma-separated list ────────────────────────────────
 contains() {
@@ -60,9 +61,9 @@ contains() {
 }
 
 submit() {
-    local model="$1" sweep="$2" routing="$3" mode="$4" rate="$5" coeff="$6" tag="$7"
+    local model="$1" routing="$2" mode="$3" rate="$4" coeff="$5" tag="$6"
     local script="${SCRIPT[$model]}"
-    local run_name="${model}_sw${sweep}_${tag}"
+    local run_name="${model}_${tag}"
     local ckpt_dir="$CKPT_ROOT/$run_name"
 
     # Build --export list: only override knobs that are not "-" so the
@@ -71,6 +72,13 @@ submit() {
     [[ "$mode"  != "-" ]] && exports="$exports,THRESHOLD_UPDATE_MODE=$mode"
     [[ "$rate"  != "-" ]] && exports="$exports,THRESHOLD_UPDATE_RATE=$rate"
     [[ "$coeff" != "-" ]] && exports="$exports,AUX_LOSS_COEFF=$coeff"
+
+    # topany OOMs at default MBS — halve MBS, double GAS (keeps GBS constant).
+    if [[ "$routing" == "topany" ]]; then
+        local mbs=$(( ${DEFAULT_MBS[$model]} / 2 ))
+        local gas=$(( ${DEFAULT_GAS[$model]} * 2 ))
+        exports="$exports,MICRO_BATCH_SIZE=$mbs,GRAD_ACCUM_STEPS=$gas"
+    fi
 
     local cmd=(
         sbatch
@@ -94,12 +102,11 @@ submit() {
 # ── enumerate & submit ──────────────────────────────────────────────────────
 count=0
 for cfg in "${CONFIGS[@]}"; do
-    IFS='|' read -r sweep routing mode rate coeff tag <<< "$cfg"
-    contains "$sweep" "$SWEEPS" || continue
+    IFS='|' read -r routing mode rate coeff tag <<< "$cfg"
 
     for model in super qwen3 gptoss; do
         contains "$model" "$MODELS" || continue
-        submit "$model" "$sweep" "$routing" "$mode" "$rate" "$coeff" "$tag"
+        submit "$model" "$routing" "$mode" "$rate" "$coeff" "$tag"
         count=$((count + 1))
     done
 done
