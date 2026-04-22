@@ -98,7 +98,16 @@ SAVE_INTERVAL=5000
 mkdir -p logs
 mkdir -p "$CHECKPOINT_DIR"
 
-module load tools/Apptainer/1.3.5-GCCcore-13.3.0
+# Auto-detect GPU architecture
+GPU_CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')
+if [ "${GPU_CC:-0}" -ge 89 ]; then
+    MIXED_PRECISION=bf16_with_fp8_current_scaling_mixed
+    module load tools/Apptainer/1.3.5-GCCcore-13.3.0
+else
+    MIXED_PRECISION=bf16_mixed
+    module load tools/Apptainer/1.3.4-GCCcore-13.3.0
+    echo "WARNING: GPU compute capability ${GPU_CC} < 89 — disabling FP8, using bf16_mixed"
+fi
 
 echo "=============================="
 echo "Job ID    : $SLURM_JOB_ID"
@@ -115,15 +124,6 @@ echo "=============================="
 
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export NCCL_NVLS_ENABLE=0
-
-# Auto-detect GPU architecture: FP8 requires compute capability >= 8.9 (Hopper)
-GPU_CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')
-if [ "${GPU_CC:-0}" -ge 89 ]; then
-    MIXED_PRECISION=bf16_with_fp8_current_scaling_mixed
-else
-    MIXED_PRECISION=bf16_mixed
-    echo "WARNING: GPU compute capability ${GPU_CC} < 89 — disabling FP8, using bf16_mixed"
-fi
 
 apptainer exec \
     --nv \
