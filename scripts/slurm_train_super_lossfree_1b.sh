@@ -130,8 +130,8 @@ if [ "${GPU_CC:-0}" -ge 89 ]; then
 else
     MIXED_PRECISION=bf16_mixed
     module load tools/Apptainer/1.3.4-GCCcore-13.3.0
-    # A100 40GB: halve micro batch size, double grad accum to preserve GBS
-    MICRO_BATCH_SIZE=$(( MICRO_BATCH_SIZE / 2 ))
+    # A100 40GB: quarter micro batch size to fit in VRAM, increase grad accum to preserve GBS
+    MICRO_BATCH_SIZE=$(( MICRO_BATCH_SIZE / 4 ))
     [ "$MICRO_BATCH_SIZE" -lt 1 ] && MICRO_BATCH_SIZE=1
     GRAD_ACCUM_STEPS=$(( GLOBAL_BATCH_SIZE / (DP * MICRO_BATCH_SIZE) ))
     echo "WARNING: GPU compute capability ${GPU_CC} < 89 — using bf16_mixed, MBS=$MICRO_BATCH_SIZE"
