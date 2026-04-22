@@ -144,6 +144,15 @@ echo "=============================="
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export NCCL_NVLS_ENABLE=0
 
+# Auto-detect GPU architecture: FP8 requires compute capability >= 8.9 (Hopper)
+GPU_CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')
+if [ "${GPU_CC:-0}" -ge 89 ]; then
+    MIXED_PRECISION=bf16_with_fp8_current_scaling_mixed
+else
+    MIXED_PRECISION=bf16_mixed
+    echo "WARNING: GPU compute capability ${GPU_CC} < 89 — disabling FP8, using bf16_mixed"
+fi
+
 apptainer exec \
     --nv \
     --no-home \
@@ -167,7 +176,7 @@ apptainer exec \
             model.moe_per_layer_logging=True \
             dataset.num_workers=4 \
             dataset.mmap_bin_files=True \
-            mixed_precision=bf16_with_fp8_current_scaling_mixed \
+            mixed_precision=$MIXED_PRECISION \
             train.global_batch_size=$GLOBAL_BATCH_SIZE \
             train.micro_batch_size=$MICRO_BATCH_SIZE \
             train.train_iters=$TRAIN_ITERS \

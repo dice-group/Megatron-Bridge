@@ -123,6 +123,15 @@ echo "=============================="
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export NCCL_NVLS_ENABLE=0
 
+# Auto-detect GPU architecture: FP8 requires compute capability >= 8.9 (Hopper)
+GPU_CC=$(nvidia-smi --query-gpu=compute_cap --format=csv,noheader | head -1 | tr -d '.')
+if [ "${GPU_CC:-0}" -ge 89 ]; then
+    MIXED_PRECISION=bf16_with_fp8_current_scaling_mixed
+else
+    MIXED_PRECISION=bf16_mixed
+    echo "WARNING: GPU compute capability ${GPU_CC} < 89 — disabling FP8, using bf16_mixed"
+fi
+
 # Multi-node: resolve master address from first SLURM node
 export MASTER_ADDR=$(scontrol show hostnames "$SLURM_JOB_NODELIST" | head -n 1)
 export MASTER_PORT=${MASTER_PORT:-29500}
@@ -157,7 +166,7 @@ srun --ntasks-per-node=1 \
             logger.wandb_entity=lukefriedrichs-paderborn-university \
             logger.log_interval=1 \
             model.moe_per_layer_logging=True \
-            +precision_config=bf16_with_fp8_current_scaling_mixed \
+            +precision_config=$MIXED_PRECISION \
             train.global_batch_size=$GLOBAL_BATCH_SIZE \
             train.micro_batch_size=$MICRO_BATCH_SIZE \
             train.train_iters=$TRAIN_ITERS \
