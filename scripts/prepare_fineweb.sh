@@ -149,9 +149,10 @@ unlimited = num_samples == 0
 
 # Cap workers at the dataset's actual parquet shard count — sharding past that
 # produces empty shards that crash with IndexError in datasets>=2.x.
+# Also cap at 8 to avoid HuggingFace rate limits (429 errors).
 _probe = load_dataset("HuggingFaceFW/fineweb", name=dataset_name, split="train", streaming=True)
 available_shards = _probe.num_shards
-num_dl_workers = max(1, min(requested_workers, available_shards))
+num_dl_workers = max(1, min(requested_workers, available_shards, 4))
 if num_dl_workers < requested_workers:
     print(f"  Dataset has only {available_shards} shards; capping workers from {requested_workers} to {num_dl_workers}")
 
@@ -161,33 +162,47 @@ else:
     print(f"  Downloading FineWeb/{dataset_name} ({num_samples:,} docs) with {num_dl_workers} parallel workers...")
 
 def worker_fn(worker_id, num_workers, queue, stop_flag):
+    import time as _time
     os.environ.setdefault("HF_HOME", _hf_cache)
     os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
-    ds = load_dataset(
-        "HuggingFaceFW/fineweb",
-        name=dataset_name,
-        split="train",
-        streaming=True,
-    ).shard(num_shards=num_workers, index=worker_id)
-    for doc in ds:
+    max_retries = 8
+    for attempt in range(max_retries):
         if stop_flag.value:
             break
-        text = doc.get("text", "").strip()
-        if text:
-            while not stop_flag.value:
-                try:
-                    queue.put(text, timeout=0.1)
+        try:
+            ds = load_dataset(
+                "HuggingFaceFW/fineweb",
+                name=dataset_name,
+                split="train",
+                streaming=True,
+            ).shard(num_shards=num_workers, index=worker_id)
+            for doc in ds:
+                if stop_flag.value:
                     break
-                except Exception:
-                    pass
+                text = doc.get("text", "").strip()
+                if text:
+                    while not stop_flag.value:
+                        try:
+                            queue.put(text, timeout=0.1)
+                            break
+                        except Exception:
+                            pass
+            break  # finished successfully
+        except Exception as e:
+            wait = min(2 ** attempt * 5, 120)
+            print(f"  [worker {worker_id}] Error: {e} — retrying in {wait}s (attempt {attempt+1}/{max_retries})", flush=True)
+            _time.sleep(wait)
     queue.put(None)  # sentinel
 
 queue      = Queue(maxsize=50_000)
 stop_flag  = Value(c_bool, False)
+import time as _time
 workers    = [Process(target=worker_fn, args=(i, num_dl_workers, queue, stop_flag), daemon=True)
               for i in range(num_dl_workers)]
-for p in workers:
+for i, p in enumerate(workers):
     p.start()
+    if i < len(workers) - 1:
+        _time.sleep(2)  # stagger starts to avoid simultaneous rate limits
 
 splits = {
     "train": (output_dir + "/fineweb_train.jsonl", train_samples),
