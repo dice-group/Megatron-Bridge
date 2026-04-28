@@ -144,6 +144,11 @@ echo "=============================="
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export NCCL_NVLS_ENABLE=0
 
+# Unique torchrun port per slurm job — required when multiple single-GPU jobs
+# get packed onto the same compute node (default 29500 collides → EADDRINUSE).
+MASTER_PORT=$((20000 + SLURM_JOB_ID % 30000))
+echo "Master port: $MASTER_PORT"
+
 apptainer exec \
     --nv \
     --no-home \
@@ -157,7 +162,7 @@ apptainer exec \
 
         pip install plotly --quiet
 
-        torchrun --nproc-per-node=$N_GPUS \
+        torchrun --nproc-per-node=$N_GPUS --master-port=$MASTER_PORT \
             examples/models/nemotron_3/pretrain_nemotron_3_super.py \
             --per-split-data-args-path=$BLEND_PATH \
             logger.wandb_project=variable-moe-routing \
