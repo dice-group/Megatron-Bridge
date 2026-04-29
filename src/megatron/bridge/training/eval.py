@@ -386,6 +386,27 @@ def evaluate_and_print_results(
             if state.cfg.logger.log_validation_ppl_to_tensorboard:
                 wandb_writer.log({"{} validation ppl".format(key): ppl}, state.train_state.step)
 
+        # Sidecar CSV for the routing sweep: append (step, key, val_loss) to
+        # logs/sweep_val_<RUN_NAME>.csv. The consolidator merges this into
+        # the main sweep diag CSV so val loss is visible alongside routing
+        # diagnostics in one file.
+        if is_last_rank():
+            try:
+                import os
+                run_name = os.environ.get("RUN_NAME", "unknown")
+                path = os.environ.get(
+                    "SWEEP_VAL_FILE",
+                    os.path.join("logs", f"sweep_val_{run_name}.csv"),
+                )
+                new_file = not os.path.exists(path)
+                os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+                with open(path, "a") as f:
+                    if new_file:
+                        f.write("run_name,step,key,val_loss\n")
+                    f.write(f"{run_name},{state.train_state.step},{key},{total_loss_dict[key].item()}\n")
+            except Exception:
+                pass  # diagnostics must never break training
+
     if process_non_loss_data_func is not None and writer and is_last_rank():
         process_non_loss_data_func(collected_non_loss_data, state.train_state.step, writer)
 
