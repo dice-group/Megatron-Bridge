@@ -71,7 +71,7 @@ def _get_router_class(routing_type: str):
     """Return the router class for the given routing type.
 
     Args:
-        routing_type: One of "topany", "lossfree", "topk".
+        routing_type: One of "topany", "lossfree", "sigmoid", "sigmoid_lossfree", "topk".
 
     Returns:
         The router class to use in the MoE module spec.
@@ -82,12 +82,19 @@ def _get_router_class(routing_type: str):
     elif routing_type == "lossfree":
         from megatron.core.transformer.moe.gate import LossFreeTopAnyRouter
         return LossFreeTopAnyRouter
+    elif routing_type == "sigmoid":
+        from megatron.core.transformer.moe.gate import SigmoidGateRouter
+        return SigmoidGateRouter
+    elif routing_type == "sigmoid_lossfree":
+        from megatron.core.transformer.moe.gate import LossFreeSigmoidRouter
+        return LossFreeSigmoidRouter
     elif routing_type == "topk":
         from megatron.core.transformer.moe.router import TopKRouter
         return TopKRouter
     else:
         raise ValueError(
-            f"Unknown routing_type '{routing_type}'. Expected one of: topany, lossfree, topk"
+            f"Unknown routing_type '{routing_type}'. Expected one of: "
+            "topany, lossfree, sigmoid, sigmoid_lossfree, topk"
         )
 
 

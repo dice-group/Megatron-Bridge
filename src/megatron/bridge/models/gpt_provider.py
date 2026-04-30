@@ -139,12 +139,23 @@ def _get_router_class(routing_type: str):
         from megatron.core.transformer.moe.gate import LossFreeTopAnyRouter
 
         return LossFreeTopAnyRouter
+    elif routing_type == "sigmoid":
+        from megatron.core.transformer.moe.gate import SigmoidGateRouter
+
+        return SigmoidGateRouter
+    elif routing_type == "sigmoid_lossfree":
+        from megatron.core.transformer.moe.gate import LossFreeSigmoidRouter
+
+        return LossFreeSigmoidRouter
     elif routing_type == "topk":
         from megatron.core.transformer.moe.router import TopKRouter
 
         return TopKRouter
     else:
-        raise ValueError(f"Unknown routing_type '{routing_type}'. Expected one of: topany, lossfree, topk")
+        raise ValueError(
+            f"Unknown routing_type '{routing_type}'. Expected one of: "
+            "topany, lossfree, sigmoid, sigmoid_lossfree, topk"
+        )
 
 
 def _swap_gpt_moe_router(spec: ModuleSpec, router_class) -> ModuleSpec:

@@ -1,21 +1,43 @@
 #!/bin/bash
 #
-# Sweep 2 — focused on the K-drift question from sweep 1.
+# Sweep 3 — sigmoid-linear router + fallback ablation.
 #
-# Sweep 1 verdict: topany family is structurally fine (thresholds bounded, val
-# loss within 0.011 of topk), but K drifted to ~1.6 instead of staying at the
-# target=2.0. The K-target loss with coeff=0.1 was too weak; the LM gradient
-# pulled K downward. This sweep tests whether stronger K-target settings can
-# anchor K at 2.0, and whether closing the K gap also closes the val-loss gap.
+# Sweep 2 verdict: stronger K-target HURT val loss (kt5 worst, kt0p3 best).
+# Forcing K=2.0 overrides a useful per-token K signal in the LM gradient.
+# Conclusion: tweaking coefficients in the cosine+threshold parameterization
+# is exhausted — the gating logic itself needs a cleaner alternative.
 #
-# Variants:
-#   1. topk                  — fresh baseline (apples-to-apples for this sweep)
-#   2. topany_kt1_lb01       — ktgt=1.0, aux=0.01, target_K=2.0  (10× stronger pull)
-#   3. topany_kt5_lb01       — ktgt=5.0, aux=0.01, target_K=2.0  (50× stronger; near-hard constraint)
-#   4. topany_kt0p3_K2p5     — ktgt=0.3, aux=0.01, target_K=2.5  (overshoot init to land at 2)
-#   5. topany_kt1_lb03       — ktgt=1.0, aux=0.03, target_K=2.0  (stronger balance + ktgt)
+# Sweep 3 introduces two new router classes:
+#   - SigmoidGateRouter:        Linear(d, E) → σ → STE(>0.5).  No threshold;
+#                               cutoff fixed at 0.5. Aux loss + optional
+#                               K-target via env vars.
+#   - LossFreeSigmoidRouter:    Same forward + per-expert bias buffer updated
+#                               outside autograd to balance load.
 #
-# Win condition: a variant lands K≈2.0 stably AND its val loss is ≤ topk's.
+# Plus a fallback ablation across both parameterizations:
+#   TOPANY_FORCE_TOP1=1 (default): tokens with K=0 fall back to top-1.
+#   TOPANY_FORCE_TOP1=0:           K=0 tokens skip MoE (residual passthrough).
+#
+# 9 jobs:
+#   1. topk                         — reference baseline
+#   2. topany_fb       (kt0p3)      — sweep 2 winner, unchanged (fallback ON)
+#   3. topany_nofb     (kt0p3)      — same config, fallback OFF (isolates fallback effect)
+#   4. sigmoid_fb                   — new sigmoid router, no K-target, fallback ON
+#   5. sigmoid_nofb                 — same, fallback OFF
+#   6. sigmoid_kt_fb                — sigmoid + K-target=0.3 K=2.5 (mirror cosine winner)
+#   7. sigmoid_kt_nofb              — same, fallback OFF
+#   8. sigmoid_lf_fb                — loss-free sigmoid (bias update), fallback ON
+#   9. sigmoid_lf_nofb              — same, fallback OFF
+#
+# What each comparison answers:
+#   2 vs 3                  → fallback effect on cosine
+#   4 vs 6                  → does K-target help the sigmoid router?
+#   4 vs 8                  → aux loss vs loss-free in sigmoid
+#   4 vs 5, 6 vs 7, 8 vs 9  → fallback effect across sigmoid variants
+#   2 vs 6                  → cosine vs sigmoid (matched K-target config)
+#   topk vs all             → reference
+#
+# Win: any variable-K variant ≤ topk val loss at step 3051.
 #
 # Usage:
 #   bash scripts/sweep_routing_small.sh
@@ -25,22 +47,27 @@ set -euo pipefail
 CKPT_BASE=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/sweep_ckpts
 mkdir -p logs
 
-# Format per row: NAME ROUTING TUMODE TURATE AUX_COEFF KTGT_COEFF KTGT_VALUE
-# TUMODE/TURATE only matter for ROUTING=lossfree (none in this sweep).
+# Format per row: NAME ROUTING TUMODE TURATE AUX_COEFF KTGT_COEFF KTGT_VALUE FORCE_TOP1
+# TUMODE/TURATE are only used by *lossfree variants (otherwise inert).
+# KTGT_COEFF=0 disables the K-target loss for topany/sigmoid.
 sweep=(
-    "small_topk                topk    magnitude 0  0     0    2.0"
-    "small_topany_kt1_lb01     topany  sign      0  0.01  1.0  2.0"
-    "small_topany_kt5_lb01     topany  sign      0  0.01  5.0  2.0"
-    "small_topany_kt0p3_K2p5   topany  sign      0  0.01  0.3  2.5"
-    "small_topany_kt1_lb03     topany  sign      0  0.03  1.0  2.0"
+    "small_topk                topk             magnitude 0     0     0     2.0   1"
+    "small_topany_fb           topany           sign      0     0.01  0.3   2.5   1"
+    "small_topany_nofb         topany           sign      0     0.01  0.3   2.5   0"
+    "small_sigmoid_fb          sigmoid          magnitude 0     0.01  0     2.0   1"
+    "small_sigmoid_nofb        sigmoid          magnitude 0     0.01  0     2.0   0"
+    "small_sigmoid_kt_fb       sigmoid          magnitude 0     0.01  0.3   2.5   1"
+    "small_sigmoid_kt_nofb     sigmoid          magnitude 0     0.01  0.3   2.5   0"
+    "small_sigmoid_lf_fb       sigmoid_lossfree sign      0.01  0     0     2.0   1"
+    "small_sigmoid_lf_nofb     sigmoid_lossfree sign      0.01  0     0     2.0   0"
 )
 
 for entry in "${sweep[@]}"; do
     # shellcheck disable=SC2086
     set -- $entry
-    NAME=$1; ROUT=$2; TUMODE=$3; TURATE=$4; AUX=$5; KTGT=$6; KTGT_VAL=$7
+    NAME=$1; ROUT=$2; TUMODE=$3; TURATE=$4; AUX=$5; KTGT=$6; KTGT_VAL=$7; FORCE_TOP1=$8
 
-    echo "Submitting: $NAME (routing=$ROUT aux=$AUX ktgt_coeff=$KTGT ktgt_value=$KTGT_VAL)"
+    echo "Submitting: $NAME (routing=$ROUT aux=$AUX ktgt_coeff=$KTGT ktgt_value=$KTGT_VAL force_top1=$FORCE_TOP1)"
 
     sbatch --gres=gpu:a100:1 \
            --export=ALL,\
@@ -51,7 +78,8 @@ THRESHOLD_UPDATE_MODE=$TUMODE,\
 THRESHOLD_UPDATE_RATE=$TURATE,\
 AUX_LOSS_COEFF=$AUX,\
 TOPANY_K_TARGET_COEFF=$KTGT,\
-TOPANY_K_TARGET=$KTGT_VAL \
+TOPANY_K_TARGET=$KTGT_VAL,\
+TOPANY_FORCE_TOP1=$FORCE_TOP1 \
         scripts/slurm_train_super_small_1gpu.sh
 done
 
