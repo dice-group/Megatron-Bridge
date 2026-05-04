@@ -23,12 +23,14 @@ inside the latest `iter_*/` subdir — both are searched automatically).
 """
 
 import argparse
+import copy
 import json
 import logging
 import os
 from typing import List, Tuple
 
 import torch
+import yaml
 from megatron.core import parallel_state
 from megatron.core.pipeline_parallel.schedules import get_forward_backward_func
 from transformers import AutoTokenizer
@@ -77,13 +79,31 @@ def find_run_config(checkpoint_path: str) -> str:
     return candidate
 
 
+_DROP_FIELDS_ON_LOAD = [
+    # The trainer serializes a tokenizer *instance* into dataset.tokenizer; on
+    # reload its constructor mutates a `config` arg that comes back as None and
+    # raises TypeError. We rebuild the tokenizer ourselves from cfg.tokenizer
+    # below, so dropping this is safe.
+    ("dataset", "tokenizer"),
+]
+
+
+def _sanitize_run_config_dict(d: dict) -> dict:
+    d = copy.deepcopy(d)
+    for parent, child in _DROP_FIELDS_ON_LOAD:
+        if isinstance(d.get(parent), dict) and child in d[parent]:
+            d[parent][child] = None
+    return d
+
+
 def load_inference_config(checkpoint_path: str) -> ConfigContainer:
     """Load the saved training config and force inference-friendly settings."""
     run_config_path = find_run_config(checkpoint_path)
     print_rank_0(f"Loading config from: {run_config_path}")
-    cfg: ConfigContainer = ConfigContainer.from_yaml(
-        run_config_path, mode=InstantiationMode.LENIENT
-    )
+    with open(run_config_path) as f:
+        raw = yaml.safe_load(f)
+    raw = _sanitize_run_config_dict(raw)
+    cfg: ConfigContainer = ConfigContainer.from_dict(raw, mode=InstantiationMode.LENIENT)
 
     # Point the loader at this checkpoint, disable saving/wandb/etc.
     cfg.checkpoint.load = checkpoint_path
