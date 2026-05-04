@@ -109,6 +109,10 @@ def load_inference_config(checkpoint_path: str) -> ConfigContainer:
     # Point the loader at this checkpoint, disable saving/wandb/etc.
     cfg.checkpoint.load = checkpoint_path
     cfg.checkpoint.save = None
+    if hasattr(cfg.checkpoint, "async_save"):
+        cfg.checkpoint.async_save = False
+    if hasattr(cfg.checkpoint, "save_interval"):
+        cfg.checkpoint.save_interval = 0
     cfg.train.train_iters = 0
     cfg.train.eval_iters = 0
     cfg.train.micro_batch_size = 1
