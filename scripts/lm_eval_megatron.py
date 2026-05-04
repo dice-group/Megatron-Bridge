@@ -44,8 +44,8 @@ from megatron.bridge.training.setup import initialize_megatron, _validate_and_se
 from megatron.bridge.training.state import GlobalState
 from megatron.bridge.training.checkpointing import load_checkpoint
 from megatron.bridge.training.tokenizers.tokenizer import build_tokenizer
-from megatron.bridge.training.utils.checkpoint_utils import CONFIG_FILE
-from megatron.bridge.training.utils.config_utils import InstantiationMode
+from megatron.bridge.training.utils.checkpoint_utils import CONFIG_FILE, _sanitize_run_config_object
+from megatron.bridge.training.utils.config_utils import InstantiationMode, apply_run_config_backward_compat
 from megatron.bridge.utils.common_utils import print_rank_0
 
 logger = logging.getLogger(__name__)
@@ -79,17 +79,18 @@ def find_run_config(checkpoint_path: str) -> str:
     return candidate
 
 
+# Fields the trainer serializes as instances that fail to reconstruct on load
+# but aren't needed for inference. The dataset's tokenizer is rebuilt from
+# cfg.tokenizer; runtime-only targets (Timers, etc.) are pruned by the repo's
+# own _sanitize_run_config_object.
 _DROP_FIELDS_ON_LOAD = [
-    # The trainer serializes a tokenizer *instance* into dataset.tokenizer; on
-    # reload its constructor mutates a `config` arg that comes back as None and
-    # raises TypeError. We rebuild the tokenizer ourselves from cfg.tokenizer
-    # below, so dropping this is safe.
     ("dataset", "tokenizer"),
 ]
 
 
 def _sanitize_run_config_dict(d: dict) -> dict:
-    d = copy.deepcopy(d)
+    d = _sanitize_run_config_object(copy.deepcopy(d))
+    d = apply_run_config_backward_compat(d)
     for parent, child in _DROP_FIELDS_ON_LOAD:
         if isinstance(d.get(parent), dict) and child in d[parent]:
             d[parent][child] = None
