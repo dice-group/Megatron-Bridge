@@ -31,7 +31,7 @@ for entry in "${sweep[@]}"; do
 
     echo "Submitting: $NAME (routing=$ROUT aux=$AUX ktgt_coeff=$KTGT ktgt_value=$KTGT_VAL force_top1=$FORCE_TOP1)"
 
-    sbatch --gres=gpu:a100:1 \
+    sbatch --gres=gpu:h100:1 \
            --time=24:00:00 \
            --export=ALL,\
 RUN_NAME=$NAME,\
