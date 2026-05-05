@@ -193,28 +193,48 @@ def check_tokenizer_alignment(megatron_tok, hf_tok) -> None:
     print_rank_0(f"[tokenizer-check] OK on {len(_TOKENIZER_CHECK_STRINGS)} test strings")
 
 
+_ROUTER_DYNAMIC_BUFFERS = ("lf_bias", "gate_thresholds")
+
+
 def check_lossfree_bias(model) -> None:
-    """If the model has lossfree routers, confirm their bias buffers loaded non-zero."""
-    found = []
+    """If the model has lossfree/top-any routers, confirm their trained buffers loaded.
+
+    Different router classes store their trained dynamic state in different
+    buffers — `lf_bias` (LossFreeRouter, topk + bias) or `gate_thresholds`
+    (LossFreeTopAnyRouter). The check passes if at least one router buffer
+    deviates from its zero/uniform init.
+    """
+    found = []  # (router_name, buffer_name, |max-init|, mean, std, init_val)
     for m in model:
         inner = m.module if hasattr(m, "module") else m
         for name, mod in inner.named_modules():
-            if hasattr(mod, "lf_bias") and isinstance(mod.lf_bias, torch.Tensor):
-                b = mod.lf_bias.detach().float()
-                found.append((name, b.abs().max().item(), b.mean().item(), b.std().item()))
+            for buf_name in _ROUTER_DYNAMIC_BUFFERS:
+                buf = getattr(mod, buf_name, None)
+                if not isinstance(buf, torch.Tensor):
+                    continue
+                t = buf.detach().float()
+                # gate_thresholds is initialized to a non-zero constant; compare
+                # against the constant init (median is robust to per-expert drift).
+                init_val = float(t.median().item()) if buf_name == "gate_thresholds" else 0.0
+                deviation = (t - init_val).abs().max().item()
+                found.append((name, buf_name, deviation, t.mean().item(), t.std().item(), init_val))
     if not found:
-        print_rank_0("[bias-check] no lossfree routers found (topk/topany/other routing)")
+        print_rank_0("[bias-check] no lossfree/top-any routers found")
         return
-    print_rank_0(f"[bias-check] found {len(found)} lossfree router(s):")
-    for name, mx, mean, std in found:
-        print_rank_0(f"  {name}: |max|={mx:.4f} mean={mean:+.4f} std={std:.4f}")
-    nonzero = sum(1 for _, mx, _, _ in found if mx > 1e-6)
-    if nonzero == 0:
-        raise RuntimeError(
-            "All lf_bias tensors are zero — checkpoint did not load the trained "
-            "router bias (or model trained for 0 steps). Aborting eval."
+    print_rank_0(f"[bias-check] found {len(found)} router buffer(s):")
+    for name, buf_name, dev, mean, std, init_val in found:
+        print_rank_0(
+            f"  {name}.{buf_name}: |dev|={dev:.4f} mean={mean:+.4f} "
+            f"std={std:.4f} init={init_val:.4f}"
         )
-    print_rank_0(f"[bias-check] {nonzero}/{len(found)} routers have non-zero trained bias")
+    moved = sum(1 for r in found if r[2] > 1e-6)
+    if moved == 0:
+        raise RuntimeError(
+            "All router dynamic buffers are at their initialization value — "
+            "checkpoint didn't load the trained router state (or model trained "
+            "for 0 steps). Aborting eval."
+        )
+    print_rank_0(f"[bias-check] {moved}/{len(found)} buffers diverged from init")
 
 
 # ---------------------------------------------------------------------------
