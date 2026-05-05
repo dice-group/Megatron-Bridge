@@ -17,6 +17,13 @@ set -euo pipefail
 CKPT_BASE=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/sweep_ckpts_24h
 mkdir -p logs
 
+# Token budget chosen to roughly fill 22h on H100 at observed ~41k tok/s
+# (default 100M finished in ~40min). MBS bumped, GAS dropped to keep GBS=32
+# but cut per-step overhead.
+TRAIN_TOKENS=3000000000
+MICRO_BATCH_SIZE=32
+GRAD_ACCUM_STEPS=1
+
 # Format per row: NAME ROUTING TUMODE TURATE AUX_COEFF KTGT_COEFF KTGT_VALUE FORCE_TOP1
 sweep=(
     "small_topk_24h           topk     magnitude 0     0     0     2.0   1"
@@ -42,7 +49,10 @@ THRESHOLD_UPDATE_RATE=$TURATE,\
 AUX_LOSS_COEFF=$AUX,\
 TOPANY_K_TARGET_COEFF=$KTGT,\
 TOPANY_K_TARGET=$KTGT_VAL,\
-TOPANY_FORCE_TOP1=$FORCE_TOP1 \
+TOPANY_FORCE_TOP1=$FORCE_TOP1,\
+TRAIN_TOKENS=$TRAIN_TOKENS,\
+MICRO_BATCH_SIZE=$MICRO_BATCH_SIZE,\
+GRAD_ACCUM_STEPS=$GRAD_ACCUM_STEPS \
         scripts/slurm_train_super_small_1gpu.sh
 done
 

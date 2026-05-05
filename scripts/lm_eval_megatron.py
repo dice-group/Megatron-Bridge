@@ -139,6 +139,20 @@ def load_inference_config(checkpoint_path: str) -> ConfigContainer:
     cfg.model.sequence_parallel = False
     cfg.model.mtp_num_layers = 0  # disable MTP head for eval
 
+    # The trainer serializes runtime callables (no_sync_func, grad_sync_func,
+    # ...) as method strings on ModelParallelConfig. Some restore as unbound
+    # methods rather than None, which makes the forward-only schedule call
+    # `with DistributedDataParallel.no_sync():` and crash. Null them all.
+    for fname in (
+        "no_sync_func",
+        "grad_sync_func",
+        "param_sync_func",
+        "grad_scale_func",
+        "finalize_model_grads_func",
+    ):
+        if hasattr(cfg.model, fname):
+            setattr(cfg.model, fname, None)
+
     return cfg
 
 
@@ -379,10 +393,21 @@ def main():
     load_checkpoint(state, model, None, None)
 
     # Disable MTP after restore (training config restores mtp_num_layers > 0)
+    # and null out runtime sync callables on the live model config too.
+    _RUNTIME_CALLABLE_FIELDS = (
+        "no_sync_func",
+        "grad_sync_func",
+        "param_sync_func",
+        "grad_scale_func",
+        "finalize_model_grads_func",
+    )
     for m in model:
         inner = m.module if hasattr(m, "module") else m
         if hasattr(inner, "config"):
             inner.config.mtp_num_layers = None
+            for fname in _RUNTIME_CALLABLE_FIELDS:
+                if hasattr(inner.config, fname):
+                    setattr(inner.config, fname, None)
         if hasattr(inner, "mtp_process"):
             inner.mtp_process = False
 
