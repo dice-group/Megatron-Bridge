@@ -17,12 +17,13 @@ set -euo pipefail
 CKPT_BASE=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/sweep_ckpts_24h
 mkdir -p logs
 
-# Token budget chosen to roughly fill 22h on H100 at observed ~41k tok/s
-# (default 100M finished in ~40min). MBS bumped, GAS dropped to keep GBS=32
-# but cut per-step overhead.
+# Token budget chosen to roughly fill 22h on H100 at observed throughput
+# (default 100M finished in ~40min). MBS bumped to amortize per-step overhead
+# but capped at 16 — vocab=131072 makes the FP32 logit buffer
+# (seq*MBS*vocab*4) the binding memory constraint (8 GiB at MBS=16).
 TRAIN_TOKENS=3000000000
-MICRO_BATCH_SIZE=32
-GRAD_ACCUM_STEPS=1
+MICRO_BATCH_SIZE=16
+GRAD_ACCUM_STEPS=2
 
 # Format per row: NAME ROUTING TUMODE TURATE AUX_COEFF KTGT_COEFF KTGT_VALUE FORCE_TOP1
 sweep=(
