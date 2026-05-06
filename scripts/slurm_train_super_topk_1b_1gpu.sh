@@ -95,7 +95,7 @@ if [ -z "$TRAIN_ITERS" ] || ! [[ "$TRAIN_ITERS" =~ ^[0-9]+$ ]]; then
 fi
 rm -f "$_ITER_CALC_ERR"
 
-SAVE_INTERVAL=5000
+SAVE_INTERVAL=1000
 
 mkdir -p logs
 mkdir -p "$CHECKPOINT_DIR"

@@ -22,7 +22,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=8
-#SBATCH --time=24:00:00
+#SBATCH --time=36:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:h100:1
 #SBATCH --mem=128GB
@@ -111,7 +111,7 @@ if [ -z "$TRAIN_ITERS" ] || ! [[ "$TRAIN_ITERS" =~ ^[0-9]+$ ]]; then
 fi
 rm -f "$_ITER_CALC_ERR"
 
-SAVE_INTERVAL=5000
+SAVE_INTERVAL=1000
 
 mkdir -p logs
 mkdir -p "$CHECKPOINT_DIR"
