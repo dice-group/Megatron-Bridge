@@ -25,11 +25,20 @@ mkdir -p logs
 GPU_TYPE="${GPU_TYPE:-h100}"
 
 # Token budget chosen to roughly fill 22h on H100.
-# WARNING: MBS=64 → FP32 logit buffer ~32 GiB (vocab=131072), 64 GiB for
-# fwd+bwd. Likely OOMs on 96 GiB H100. GBS jumps 32 → 256 (8× larger).
+# Per-GPU MBS sized so vocab=131072 FP32 logit buffer fits with headroom for
+# fwd+bwd activations. GBS=256 held constant via grad accumulation.
+#   - H100 96 GiB: MBS=64, GAS=4
+#   - A100 40 GiB: MBS=32 (slurm script halves to 16 for CC<89), GAS=8
+#     → 8 GiB logit buffer, fits in 40 GiB. MBS=64 OOMs (16 GiB buffer + 25
+#     GiB weights/acts ≈ 40 GiB, no headroom).
 TRAIN_TOKENS=3000000000
-MICRO_BATCH_SIZE=64
-GRAD_ACCUM_STEPS=4
+if [ "$GPU_TYPE" = "a100" ]; then
+    MICRO_BATCH_SIZE=32
+    GRAD_ACCUM_STEPS=8
+else
+    MICRO_BATCH_SIZE=64
+    GRAD_ACCUM_STEPS=4
+fi
 
 # Annealing schedule for sigmoid_lossfree_anneal:
 #   ~9.2k optimizer steps total at GBS=256, seq=1024, 3B tokens →
@@ -53,8 +62,11 @@ submit() {
 
     echo "Submitting: $name (routing=$routing_type)"
 
+    # No --exclusive: each job uses 1 GPU. Reserving the whole node lets
+    # SLURM expose multiple GPUs to the process, which trips torch's lazy
+    # CUDA init (`device=N, num_gpus=N` assertion) when transformer_engine
+    # imports. Sharing the node with other 1-GPU jobs is fine.
     sbatch --gres=gpu:${GPU_TYPE}:1 \
-           --exclusive \
            --time=24:00:00 \
            --export=ALL,RUN_NAME=$name,CHECKPOINT_DIR=$CKPT_BASE/$name,ROUTING_TYPE=$routing_type,TRAIN_TOKENS=$TRAIN_TOKENS,MICRO_BATCH_SIZE=$MICRO_BATCH_SIZE,GRAD_ACCUM_STEPS=$GRAD_ACCUM_STEPS$extra_env \
         scripts/slurm_train_super_small_1gpu.sh
