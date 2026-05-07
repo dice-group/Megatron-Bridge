@@ -90,42 +90,46 @@ submit advrouting_remoe_k1p5_24h remoe \
 # ── 3. AdaMoE — m=16 nulls, top-3 → expected real-K = 2.0 ──────────────────
 # Closest match to topk's K=2: 32 real + 16 null = 48; top-3 over 48 yields
 # expected 2 real + 1 null, average real-K = 2.0.
-submit advrouting_adamoe_m16_k3_24h adamoe \
-    AUX_LOSS_COEFF=0.01 \
-    TOPANY_FORCE_TOP1=1 \
-    ADAMOE_NUM_NULL=16 \
-    ADAMOE_TOPK=3
+# Already running / completed; uncomment to re-submit.
+# submit advrouting_adamoe_m16_k3_24h adamoe \
+#     AUX_LOSS_COEFF=0.01 \
+#     TOPANY_FORCE_TOP1=1 \
+#     ADAMOE_NUM_NULL=16 \
+#     ADAMOE_TOPK=3
 
 # ── 4. AdaMoE — m=8 nulls, top-2 → expected real-K = 1.6 ───────────────────
 # Compute-reduced variant: more aggressive null usage, lower average real-K.
-submit advrouting_adamoe_m8_k2_24h adamoe \
-    AUX_LOSS_COEFF=0.01 \
-    TOPANY_FORCE_TOP1=1 \
-    ADAMOE_NUM_NULL=8 \
-    ADAMOE_TOPK=2
+# Already running / completed; uncomment to re-submit.
+# submit advrouting_adamoe_m8_k2_24h adamoe \
+#     AUX_LOSS_COEFF=0.01 \
+#     TOPANY_FORCE_TOP1=1 \
+#     ADAMOE_NUM_NULL=8 \
+#     ADAMOE_TOPK=2
 
 # ── 5. DTopP — PI controller targeting K=2 ─────────────────────────────────
 # p_init=1.0 (well above the K=1 collapse regime); KP/KI tuned conservative.
-submit advrouting_dtopp_k2_24h dtopp \
-    AUX_LOSS_COEFF=0.01 \
-    TOPANY_FORCE_TOP1=1 \
-    DTOPP_TARGET_K=2.0 \
-    DTOPP_KP=0.05 \
-    DTOPP_KI=0.005 \
-    DTOPP_P_INIT=1.0 \
-    TOPP_ENTROPY_COEFF=0
+# Already running / completed; uncomment to re-submit.
+# submit advrouting_dtopp_k2_24h dtopp \
+#     AUX_LOSS_COEFF=0.01 \
+#     TOPANY_FORCE_TOP1=1 \
+#     DTOPP_TARGET_K=2.0 \
+#     DTOPP_KP=0.05 \
+#     DTOPP_KI=0.005 \
+#     DTOPP_P_INIT=1.0 \
+#     TOPP_ENTROPY_COEFF=0
 
 # ── 6. DTopP — PI controller targeting K=1.5 ───────────────────────────────
-submit advrouting_dtopp_k1p5_24h dtopp \
-    AUX_LOSS_COEFF=0.01 \
-    TOPANY_FORCE_TOP1=1 \
-    DTOPP_TARGET_K=1.5 \
-    DTOPP_KP=0.05 \
-    DTOPP_KI=0.005 \
-    DTOPP_P_INIT=1.0 \
-    TOPP_ENTROPY_COEFF=0
+# Already running / completed; uncomment to re-submit.
+# submit advrouting_dtopp_k1p5_24h dtopp \
+#     AUX_LOSS_COEFF=0.01 \
+#     TOPANY_FORCE_TOP1=1 \
+#     DTOPP_TARGET_K=1.5 \
+#     DTOPP_KP=0.05 \
+#     DTOPP_KI=0.005 \
+#     DTOPP_P_INIT=1.0 \
+#     TOPP_ENTROPY_COEFF=0
 
 echo
-echo "All 6 advanced-routing variants submitted (24h walltime each)."
+echo "Re-submitting only the 2 ReMoE variants (others completed/running)."
 echo "Track with: squeue -u \$USER"
 echo "W&B project: variable-moe-routing (compare against small_topk_24h)"
