@@ -21,6 +21,9 @@ set -euo pipefail
 CKPT_BASE=/scratch/hpc-prf-merlin/luke/Megatron-Bridge/sweep_ckpts_24h
 mkdir -p logs
 
+# GPU type for --gres. Override with: GPU_TYPE=a100 bash scripts/sweep_routing_small_24h.sh
+GPU_TYPE="${GPU_TYPE:-h100}"
+
 # Token budget chosen to roughly fill 22h on H100.
 # WARNING: MBS=64 → FP32 logit buffer ~32 GiB (vocab=131072), 64 GiB for
 # fwd+bwd. Likely OOMs on 96 GiB H100. GBS jumps 32 → 256 (8× larger).
@@ -50,7 +53,7 @@ submit() {
 
     echo "Submitting: $name (routing=$routing_type)"
 
-    sbatch --gres=gpu:h100:1 \
+    sbatch --gres=gpu:${GPU_TYPE}:1 \
            --exclusive \
            --time=24:00:00 \
            --export=ALL,RUN_NAME=$name,CHECKPOINT_DIR=$CKPT_BASE/$name,ROUTING_TYPE=$routing_type,TRAIN_TOKENS=$TRAIN_TOKENS,MICRO_BATCH_SIZE=$MICRO_BATCH_SIZE,GRAD_ACCUM_STEPS=$GRAD_ACCUM_STEPS$extra_env \
