@@ -159,6 +159,10 @@ apptainer exec \
     "$CONTAINER" \
     bash -c "
         export HOME=/tmp
+        # Reduce allocator fragmentation; mattered on 40 GiB A100 where the
+        # FP32 logit buffer + activations + reserved-unallocated slack
+        # (~4 GiB) added up to OOM. Harmless on H100.
+        export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
         pip install plotly --quiet
 

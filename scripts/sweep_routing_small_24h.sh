@@ -25,19 +25,19 @@ mkdir -p logs
 GPU_TYPE="${GPU_TYPE:-h100}"
 
 # Token budget chosen to roughly fill 22h on H100.
-# Per-GPU MBS sized so vocab=131072 FP32 logit buffer fits with headroom for
-# fwd+bwd activations. GBS=256 held constant via grad accumulation.
-#   - H100 96 GiB: MBS=64, GAS=4
-#   - A100 40 GiB: MBS=32 (slurm script halves to 16 for CC<89), GAS=8
-#     → 8 GiB logit buffer, fits in 40 GiB. MBS=64 OOMs (16 GiB buffer + 25
-#     GiB weights/acts ≈ 40 GiB, no headroom).
+# GBS=64 held constant across GPU types so val-loss curves are directly
+# comparable when this sweep is run on different hardware. MBS picked to
+# fully use each GPU's memory:
+#   - H100 96 GiB: MBS=64, GAS=1 → GBS=64
+#   - A100 40 GiB: MBS=16 (slurm script halves to 8 for CC<89), GAS=4
+#     → MBS=8 actual ≈ 17 GiB acts + 4 GiB logit ≈ 25 GiB total, fits.
 TRAIN_TOKENS=3000000000
 if [ "$GPU_TYPE" = "a100" ]; then
-    MICRO_BATCH_SIZE=32
-    GRAD_ACCUM_STEPS=8
+    MICRO_BATCH_SIZE=16
+    GRAD_ACCUM_STEPS=4
 else
     MICRO_BATCH_SIZE=64
-    GRAD_ACCUM_STEPS=4
+    GRAD_ACCUM_STEPS=1
 fi
 
 # Annealing schedule for sigmoid_lossfree_anneal:
