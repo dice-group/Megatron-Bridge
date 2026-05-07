@@ -88,13 +88,23 @@ def _get_router_class(routing_type: str):
     elif routing_type == "sigmoid_lossfree":
         from megatron.core.transformer.moe.gate import LossFreeSigmoidRouter
         return LossFreeSigmoidRouter
+    elif routing_type == "et":
+        from megatron.core.transformer.moe.gate import ETRouter
+        return ETRouter
+    elif routing_type == "topp":
+        from megatron.core.transformer.moe.gate import TopPRouter
+        return TopPRouter
+    elif routing_type == "sigmoid_lossfree_anneal":
+        from megatron.core.transformer.moe.gate import LossFreeSigmoidAnnealRouter
+        return LossFreeSigmoidAnnealRouter
     elif routing_type == "topk":
         from megatron.core.transformer.moe.router import TopKRouter
         return TopKRouter
     else:
         raise ValueError(
             f"Unknown routing_type '{routing_type}'. Expected one of: "
-            "topany, lossfree, sigmoid, sigmoid_lossfree, topk"
+            "topany, lossfree, sigmoid, sigmoid_lossfree, "
+            "sigmoid_lossfree_anneal, et, topp, topk"
         )
 
 
