@@ -62,8 +62,7 @@ for run_dir in "$CKPT_BASE"/*/; do
     LIMIT="$LIMIT" \
     WANDB_PROJECT="$WANDB_PROJECT" \
     WANDB_RUN_NAME="$name" \
-    sbatch --partition=gpu_${GPU_TYPE} \
-        --gres=gpu:${GPU_TYPE}:1 \
+    sbatch --gres=gpu:${GPU_TYPE}:1 \
         --job-name="eval-${name}" \
         --export=ALL \
         scripts/slurm_eval_lm_harness.sh
