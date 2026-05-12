@@ -389,7 +389,46 @@ def parse_cli_args():
     parser.add_argument("--output-path", type=str, default=None)
     parser.add_argument("--skip-tokenizer-check", action="store_true")
     parser.add_argument("--skip-bias-check", action="store_true")
+    parser.add_argument("--wandb-project", type=str, default=None,
+                        help="If set, log eval metrics to this W&B project.")
+    parser.add_argument("--wandb-entity", type=str, default=None)
+    parser.add_argument("--wandb-run-name", type=str, default=None,
+                        help="W&B run name (typically the training run being eval'd).")
     return parser.parse_args()
+
+
+def _log_results_to_wandb(args, summary):
+    """Push per-task metrics to W&B as a single summary point."""
+    import wandb
+
+    flat = {}
+    for task, metrics in summary.items():
+        if not isinstance(metrics, dict):
+            continue
+        for k, v in metrics.items():
+            if k == "alias" or not isinstance(v, (int, float)):
+                continue
+            metric_name = k.split(",")[0]  # drop lm-eval's ",none" filter suffix
+            flat[f"eval/{task}/{metric_name}"] = v
+
+    run = wandb.init(
+        project=args.wandb_project,
+        entity=args.wandb_entity,
+        name=args.wandb_run_name,
+        job_type="lm-eval",
+        config={
+            "checkpoint": args.checkpoint,
+            "tasks": args.tasks,
+            "num_fewshot": args.num_fewshot,
+            "batch_size": args.batch_size,
+            "limit": args.limit,
+        },
+        reinit=True,
+    )
+    run.log(flat)
+    run.summary.update(flat)
+    run.finish()
+    print(f"Logged {len(flat)} metrics to W&B project={args.wandb_project} run={args.wandb_run_name}")
 
 
 def main():
@@ -467,6 +506,11 @@ def main():
             with open(args.output_path, "w") as f:
                 json.dump({"results": summary}, f, indent=2, default=str)
             print(f"Wrote {args.output_path}")
+        if args.wandb_project:
+            try:
+                _log_results_to_wandb(args, summary)
+            except Exception as e:
+                print(f"[wandb] failed to log results: {e}")
 
     if torch.distributed.is_initialized():
         torch.distributed.destroy_process_group()
