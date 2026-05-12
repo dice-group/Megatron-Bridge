@@ -36,9 +36,19 @@ for entry in "${RUNS[@]}"; do
         continue
     fi
     echo "Submitting eval: $name  ($ckpt)"
+    # sbatch --export uses commas as variable separators, so values containing
+    # commas (TASKS=hellaswag,arc_easy,...) get split into bogus empty vars.
+    # Forward via the process environment + --export=ALL instead.
+    CHECKPOINT="$ckpt" \
+    TASKS="$TASKS" \
+    BATCH_SIZE="$BATCH_SIZE" \
+    NUM_FEWSHOT="$NUM_FEWSHOT" \
+    LIMIT="$LIMIT" \
+    WANDB_PROJECT="$WANDB_PROJECT" \
+    WANDB_RUN_NAME="$name" \
     sbatch --gres=gpu:${GPU_TYPE}:1 \
         --job-name="eval-${name}" \
-        --export=ALL,CHECKPOINT=$ckpt,TASKS=$TASKS,BATCH_SIZE=$BATCH_SIZE,NUM_FEWSHOT=$NUM_FEWSHOT,LIMIT=$LIMIT,WANDB_PROJECT=$WANDB_PROJECT,WANDB_RUN_NAME=$name \
+        --export=ALL \
         scripts/slurm_eval_lm_harness.sh
 done
 

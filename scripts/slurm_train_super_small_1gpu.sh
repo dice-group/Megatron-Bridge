@@ -110,7 +110,11 @@ rm -f "$_ITER_CALC_ERR"
 
 # Denser eval cadence so we get a good val-loss curve in a short run
 EVAL_INTERVAL=200
-SAVE_INTERVAL=10000   # effectively no checkpointing for a smoke test
+# Real checkpoints — multiple saves per run so a walltime kill near the end
+# doesn't lose everything. The earlier sweep had SAVE_INTERVAL=TRAIN_ITERS,
+# which meant the only save attempt happened right at walltime and was
+# truncated (common.pt + modelopt_run_config.yaml only, no distcp shards).
+SAVE_INTERVAL="${SAVE_INTERVAL:-1000}"
 
 mkdir -p logs
 mkdir -p "$CHECKPOINT_DIR"
@@ -208,7 +212,8 @@ apptainer exec \
             model.seq_length=$SEQ_LENGTH \
             dataset.sequence_length=$SEQ_LENGTH \
             checkpoint.save=$CHECKPOINT_DIR \
-            checkpoint.save_interval=$SAVE_INTERVAL
+            checkpoint.save_interval=$SAVE_INTERVAL \
+            checkpoint.async_save=False
     "
 
 echo "=============================="
