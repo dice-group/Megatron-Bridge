@@ -3,8 +3,7 @@
 # Run lm-evaluation-harness on a Megatron-Bridge checkpoint.
 #
 # Usage:
-#   sbatch --gres=gpu:a100:1 \
-#          --export=ALL,CHECKPOINT=/scratch/.../checkpoints_lossfree,TASKS=hellaswag,arc_easy,WANDB_PROJECT=variable-moe-routing,WANDB_RUN_NAME=my_run \
+#   sbatch --export=ALL,CHECKPOINT=/path/to/ckpt,TASKS=hellaswag,arc_easy,WANDB_PROJECT=variable-moe-routing,WANDB_RUN_NAME=my_run \
 #       scripts/slurm_eval_lm_harness.sh
 #
 # Or set vars in the environment then sbatch:
@@ -24,7 +23,7 @@
 #SBATCH --cpus-per-task=8
 #SBATCH --time=06:00:00
 #SBATCH --partition=gpu
-#SBATCH --gres=gpu:a100:1
+#SBATCH --gres=gpu:h100:1
 #SBATCH --mem=128GB
 #SBATCH --account=hpc-prf-merlin
 #SBATCH --output=logs/eval_%j.out
