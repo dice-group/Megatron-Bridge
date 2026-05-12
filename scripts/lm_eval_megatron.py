@@ -141,7 +141,10 @@ def load_inference_config(checkpoint_path: str) -> ConfigContainer:
 
     # Force bf16 for eval — FP8 GEMMs require the leading dim be divisible by 8,
     # which lm-eval's variable mini-batches violate (e.g. batch=3 → assert).
-    # We're not optimising throughput here; bf16 is fine.
+    # The saved mixed_precision recipe (e.g. bf16_with_fp8_current_scaling_mixed)
+    # would otherwise be re-applied by runtime_config_update → setup(cfg.model)
+    # and overwrite cfg.model.fp8. Swap to plain bf16_mixed.
+    cfg.mixed_precision = "bf16_mixed"
     if hasattr(cfg.model, "fp8"):
         cfg.model.fp8 = None
     if hasattr(cfg.model, "fp8_param"):
