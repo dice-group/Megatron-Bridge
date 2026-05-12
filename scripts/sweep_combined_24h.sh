@@ -45,7 +45,9 @@ set -euo pipefail
 CKPT_BASE="${CKPT_BASE:-/scratch/hpc-prf-merlin/luke/Megatron-Bridge/sweep_ckpts_combined_24h}"
 mkdir -p logs
 
-GPU_TYPE="${GPU_TYPE:-h100}"
+# Default to A100 — the n2 cluster is A100-only; H100s live on a separate
+# cluster (different login node) and don't accept jobs targeting the other.
+GPU_TYPE="${GPU_TYPE:-a100}"
 
 # Same compute budget as the prior three sweeps so val-loss curves overlay cleanly.
 TRAIN_TOKENS=3000000000
@@ -82,7 +84,8 @@ submit() {
 
     echo "Submitting: $name (routing=$routing_type)"
 
-    sbatch --gres=gpu:${GPU_TYPE}:1 \
+    sbatch --partition=gpu_${GPU_TYPE} \
+           --gres=gpu:${GPU_TYPE}:1 \
            --time=24:00:00 \
            --export=ALL,RUN_NAME=$name,CHECKPOINT_DIR=$CKPT_BASE/$name,ROUTING_TYPE=$routing_type,TRAIN_TOKENS=$TRAIN_TOKENS,MICRO_BATCH_SIZE=$MICRO_BATCH_SIZE,GRAD_ACCUM_STEPS=$GRAD_ACCUM_STEPS$extra_env \
         scripts/slurm_train_super_small_1gpu.sh
