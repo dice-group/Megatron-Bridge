@@ -139,6 +139,14 @@ def load_inference_config(checkpoint_path: str) -> ConfigContainer:
     cfg.model.sequence_parallel = False
     cfg.model.mtp_num_layers = 0  # disable MTP head for eval
 
+    # Force bf16 for eval — FP8 GEMMs require the leading dim be divisible by 8,
+    # which lm-eval's variable mini-batches violate (e.g. batch=3 → assert).
+    # We're not optimising throughput here; bf16 is fine.
+    if hasattr(cfg.model, "fp8"):
+        cfg.model.fp8 = None
+    if hasattr(cfg.model, "fp8_param"):
+        cfg.model.fp8_param = False
+
     # The trainer serializes runtime callables (no_sync_func, grad_sync_func,
     # ...) as method strings on ModelParallelConfig. Some restore as unbound
     # methods rather than None, which makes the forward-only schedule call
