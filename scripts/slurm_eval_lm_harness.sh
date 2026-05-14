@@ -38,12 +38,15 @@ TASKS="${TASKS:-hellaswag,arc_easy,arc_challenge,piqa,winogrande,boolq,openbookq
 BATCH_SIZE="${BATCH_SIZE:-8}"
 NUM_FEWSHOT="${NUM_FEWSHOT:-0}"
 LIMIT="${LIMIT:-}"   # leave empty to run full task; set e.g. 50 for smoke test
-OUTPUT_PATH="${OUTPUT_PATH:-logs/eval_${SLURM_JOB_ID}.json}"
 
 # W&B logging — leave WANDB_PROJECT empty to disable.
 WANDB_PROJECT="${WANDB_PROJECT:-}"
 WANDB_ENTITY="${WANDB_ENTITY:-lukefriedrichs-paderborn-university}"
 WANDB_RUN_NAME="${WANDB_RUN_NAME:-$(basename "$CHECKPOINT")}"
+
+# Embed run name in the result filename so it's obvious which training run
+# produced which eval (job id kept as a uniqueness suffix).
+OUTPUT_PATH="${OUTPUT_PATH:-logs/eval_${WANDB_RUN_NAME}_${SLURM_JOB_ID}.json}"
 
 # Load WANDB_API_KEY (and any other secrets) from .env
 if [ -f "$PWD/.env" ]; then

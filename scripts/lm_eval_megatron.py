@@ -514,8 +514,19 @@ def main():
         print("\n========= lm-eval results =========")
         print(json.dumps(summary, indent=2, default=str))
         if args.output_path:
+            eval_iter_env = os.environ.get("EVAL_ITER", "").strip()
+            payload = {
+                "run_name": args.wandb_run_name or os.path.basename(args.checkpoint.rstrip("/")),
+                "checkpoint": args.checkpoint,
+                "eval_iter": int(eval_iter_env) if eval_iter_env.isdigit() else (eval_iter_env or None),
+                "tasks": task_list,
+                "num_fewshot": args.num_fewshot,
+                "batch_size": args.batch_size,
+                "limit": args.limit,
+                "results": summary,
+            }
             with open(args.output_path, "w") as f:
-                json.dump({"results": summary}, f, indent=2, default=str)
+                json.dump(payload, f, indent=2, default=str)
             print(f"Wrote {args.output_path}")
         if args.wandb_project:
             try:
