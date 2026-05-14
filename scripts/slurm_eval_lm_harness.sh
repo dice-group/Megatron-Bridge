@@ -86,6 +86,11 @@ echo "Tasks     : $TASKS"
 echo "Batch sz  : $BATCH_SIZE  fewshot=$NUM_FEWSHOT  limit=${LIMIT:-full}"
 echo "Output    : $OUTPUT_PATH"
 echo "W&B       : ${WANDB_PROJECT:-disabled} / run=${WANDB_RUN_NAME}"
+
+# Multiple eval jobs may land on the same node — give each torchrun a unique
+# rendezvous port to avoid EADDRINUSE on the default 29500.
+MASTER_PORT=$(( 20000 + SLURM_JOB_ID % 40000 ))
+echo "MasterPort: $MASTER_PORT"
 echo "=============================="
 
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
@@ -106,6 +111,7 @@ apptainer exec \
         pip install lm-eval wandb --quiet
 
         torchrun --nproc-per-node=1 \
+            --master-port=$MASTER_PORT \
             scripts/lm_eval_megatron.py \
             --checkpoint $CHECKPOINT \
             --tasks $TASKS \
