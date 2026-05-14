@@ -91,15 +91,33 @@ echo "W&B       : ${WANDB_PROJECT:-disabled} / run=${WANDB_RUN_NAME}"
 # rendezvous port to avoid EADDRINUSE on the default 29500.
 MASTER_PORT=$(( 20000 + SLURM_JOB_ID % 40000 ))
 echo "MasterPort: $MASTER_PORT"
+echo "CUDA_VISIBLE_DEVICES (slurm): ${CUDA_VISIBLE_DEVICES:-<unset>}"
+echo "SLURM_JOB_GPUS               : ${SLURM_JOB_GPUS:-<unset>}"
+echo "SLURM_STEP_GPUS              : ${SLURM_STEP_GPUS:-<unset>}"
+echo "--- nvidia-smi (outside container) ---"
+nvidia-smi -L || echo "(nvidia-smi -L failed)"
 echo "=============================="
+
+# Fail fast on the no-GPU-allocated case so we don't spend the queue slot on
+# a job that will crash inside Megatron's CUDA init.
+if [ -z "${CUDA_VISIBLE_DEVICES:-}" ] && [ -z "${SLURM_JOB_GPUS:-}" ] && [ -z "${SLURM_STEP_GPUS:-}" ]; then
+    echo "ERROR: no GPU env vars set by SLURM — was --gres=gpu:...:1 honored?" >&2
+    exit 1
+fi
 
 export TORCH_NCCL_AVOID_RECORD_STREAMS=1
 export NCCL_NVLS_ENABLE=0
 
+# Explicitly forward GPU-visibility env vars to the container. Some apptainer
+# configs scrub the env on exec; without these, --nv exposes the device files
+# but the runtime sees CUDA_VISIBLE_DEVICES unset → "No CUDA GPUs are available".
 apptainer exec \
     --nv \
     --no-home \
     --env WANDB_API_KEY="${WANDB_API_KEY:-}" \
+    --env CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-}" \
+    --env SLURM_JOB_GPUS="${SLURM_JOB_GPUS:-}" \
+    --env SLURM_STEP_GPUS="${SLURM_STEP_GPUS:-}" \
     --bind "$PWD":/opt/Megatron-Bridge \
     --bind "$CHECKPOINT":"$CHECKPOINT" \
     --pwd /opt/Megatron-Bridge \
@@ -107,6 +125,8 @@ apptainer exec \
     bash -c "
         export HOME=/tmp
         export HF_HOME=/tmp/hf_cache
+        echo 'CUDA_VISIBLE_DEVICES (in container): '\${CUDA_VISIBLE_DEVICES:-<unset>}
+        nvidia-smi -L || echo '(nvidia-smi -L failed inside container)'
 
         pip install lm-eval wandb --quiet
 
