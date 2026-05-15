@@ -193,10 +193,27 @@ export NCCL_NVLS_ENABLE=0
 
 MASTER_PORT=$((20000 + SLURM_JOB_ID % 30000))
 echo "Master port: $MASTER_PORT"
+echo "CUDA_VISIBLE_DEVICES (slurm): ${CUDA_VISIBLE_DEVICES:-<unset>}"
+echo "SLURM_JOB_GPUS               : ${SLURM_JOB_GPUS:-<unset>}"
+echo "SLURM_STEP_GPUS              : ${SLURM_STEP_GPUS:-<unset>}"
 
+# Fail fast on the no-GPU-allocated case.
+if [ -z "${CUDA_VISIBLE_DEVICES:-}" ] && [ -z "${SLURM_JOB_GPUS:-}" ] && [ -z "${SLURM_STEP_GPUS:-}" ]; then
+    echo "ERROR: no GPU env vars set by SLURM — was --gres=gpu:...:1 honored?" >&2
+    exit 1
+fi
+
+# Forward GPU-visibility env vars to the container. Some apptainer configs
+# scrub the env on exec; without these, --nv exposes the device files but the
+# runtime sees CUDA_VISIBLE_DEVICES unset and tries device 0 → on a multi-GPU
+# node this collides with whoever owns device 0 → cudaErrorDevicesUnavailable.
+# (Same fix slurm_eval_lm_harness.sh already uses.)
 apptainer exec \
     --nv \
     --no-home \
+    --env CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-}" \
+    --env SLURM_JOB_GPUS="${SLURM_JOB_GPUS:-}" \
+    --env SLURM_STEP_GPUS="${SLURM_STEP_GPUS:-}" \
     --bind "$PWD":/opt/Megatron-Bridge \
     --bind "$DATA_DIR":"$DATA_DIR" \
     --bind "$CHECKPOINT_DIR":"$CHECKPOINT_DIR" \

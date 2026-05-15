@@ -67,10 +67,14 @@ K_ANNEAL_END=6.0
 K_ANNEAL_START_STEP=0
 K_ANNEAL_END_STEP=30000
 
-# Sanity-mode walltime — short enough that a queue full of sanity jobs
-# clears fast, long enough to save twice at SAVE_INTERVAL=20.
-SANITY_TIME="${SANITY_TIME:-00:45:00}"
-SANITY_TRAIN_TOKENS="${SANITY_TRAIN_TOKENS:-15000000}"
+# Sanity-mode walltime — must cover (a) container init + python import +
+# dataset indexing (~8-10 min cold), (b) ~30s/iter at 1B with FP8 compile on
+# the first iter taking ~5 min, (c) at least one save (~60s for distcp).
+# Empirically 45 min was tight (one run timed out mid-second-save before the
+# verification block ran). 90 min gives margin so the verifier runs and
+# afterok dependency releases cleanly.
+SANITY_TIME="${SANITY_TIME:-01:30:00}"
+SANITY_TRAIN_TOKENS="${SANITY_TRAIN_TOKENS:-8000000}"   # ~30 iters → save at 20
 SANITY_SAVE_INTERVAL="${SANITY_SAVE_INTERVAL:-20}"
 
 ONLY="${ONLY:-}"
