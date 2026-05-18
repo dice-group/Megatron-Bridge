@@ -77,6 +77,13 @@ SANITY_TIME="${SANITY_TIME:-01:30:00}"
 SANITY_TRAIN_TOKENS="${SANITY_TRAIN_TOKENS:-8000000}"   # ~30 iters → save at 20
 SANITY_SAVE_INTERVAL="${SANITY_SAVE_INTERVAL:-20}"
 
+# Main-job save interval. Training-script default is 2500, which at ~30s/iter
+# on 1B/1GPU + container init + periodic eval pauses is borderline-unreachable
+# in 24h — the original sweep finished walltime with zero iter_* dirs. 500
+# yields ~4–5 saves over 24h with the first landing ~3-4h in, well before the
+# walltime guillotine.
+MAIN_SAVE_INTERVAL="${MAIN_SAVE_INTERVAL:-500}"
+
 ONLY="${ONLY:-}"
 SKIP_SANITY="${SKIP_SANITY:-0}"
 
@@ -128,12 +135,12 @@ submit() {
     local main_id
     main_id=$(sbatch --parsable \
         --gres=gpu:${GPU_TYPE}:1 \
-        --time=24:00:00 \
+        --time=48:00:00 \
         --job-name="$name" \
         --output="logs/${name}_%j.out" \
         --error="logs/${name}_%j.err" \
         $main_dep \
-        --export=ALL,SANITY_MODE=0,RUN_NAME=$name,CHECKPOINT_DIR=$ckpt_main,ROUTING_TYPE=$routing_type,TRAIN_TOKENS=$TRAIN_TOKENS,MICRO_BATCH_SIZE=$MICRO_BATCH_SIZE,GRAD_ACCUM_STEPS=$GRAD_ACCUM_STEPS$extra_env \
+        --export=ALL,SANITY_MODE=0,RUN_NAME=$name,CHECKPOINT_DIR=$ckpt_main,ROUTING_TYPE=$routing_type,TRAIN_TOKENS=$TRAIN_TOKENS,SAVE_INTERVAL=$MAIN_SAVE_INTERVAL,MICRO_BATCH_SIZE=$MICRO_BATCH_SIZE,GRAD_ACCUM_STEPS=$GRAD_ACCUM_STEPS$extra_env \
         $TRAIN_SCRIPT)
     SUBMITTED_MAIN+=("$main_id:$name")
 }
