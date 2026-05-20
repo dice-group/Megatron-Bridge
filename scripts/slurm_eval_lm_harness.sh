@@ -118,6 +118,8 @@ apptainer exec \
     --env CUDA_VISIBLE_DEVICES="${CUDA_VISIBLE_DEVICES:-}" \
     --env SLURM_JOB_GPUS="${SLURM_JOB_GPUS:-}" \
     --env SLURM_STEP_GPUS="${SLURM_STEP_GPUS:-}" \
+    --env ADAMOE_NUM_NULL="${ADAMOE_NUM_NULL:-}" \
+    --env ADAMOE_TOPK="${ADAMOE_TOPK:-}" \
     --bind "$PWD":/opt/Megatron-Bridge \
     --bind "$CHECKPOINT":"$CHECKPOINT" \
     --pwd /opt/Megatron-Bridge \

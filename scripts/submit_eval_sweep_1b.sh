@@ -155,6 +155,20 @@ for run_dir in "$CKPT_BASE"/*/; do
 
     echo "Submitting eval: $name  (iter=$iter_num)"
 
+    # Per-run routing env. AdaMoE expands the router weight to
+    # (num_experts + num_null, hidden), so the eval-time MoE layer must
+    # match the training-time null count or checkpoint load fails with a
+    # router.weight shape mismatch. gate.py reads these from os.environ at
+    # MoE construction; defaults are NUM_NULL=16, TOPK=3.
+    adamoe_num_null=""
+    adamoe_topk=""
+    case "$name" in
+        adamoe_m64_k9_1b_24h) adamoe_num_null=64; adamoe_topk=9 ;;
+        adamoe_m32_k6_1b_24h) adamoe_num_null=32; adamoe_topk=6 ;;
+        adamoe_m16_k3_1b_24h) adamoe_num_null=16; adamoe_topk=3 ;;
+        adamoe_m8_k2_1b_24h)  adamoe_num_null=8;  adamoe_topk=2 ;;
+    esac
+
     job_id=$(CHECKPOINT="$ckpt_path" \
     TASKS="$TASKS" \
     BATCH_SIZE="$BATCH_SIZE" \
@@ -163,6 +177,8 @@ for run_dir in "$CKPT_BASE"/*/; do
     WANDB_PROJECT="$WANDB_PROJECT" \
     WANDB_RUN_NAME="$name" \
     EVAL_ITER="$iter_num" \
+    ADAMOE_NUM_NULL="$adamoe_num_null" \
+    ADAMOE_TOPK="$adamoe_topk" \
     sbatch --parsable \
         --gres=gpu:${GPU_TYPE}:1 \
         --job-name="eval-${name}" \
